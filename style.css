@@ -1,0 +1,753 @@
+/* ============================================================
+   KSBOLD — Estilos do Site do Cliente
+   ============================================================ */
+
+/* --- Reset & Base --- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Paleta de cores */
+  --bg-dark: #0a2e2e;
+  --bg-dark-2: #0d3b3b;
+  --bg-dark-3: #0f4545;
+  --accent-gold: #d4b896;
+  --accent-cream: #f5e6d0;
+  --accent-light: #e8d5bc;
+  --green-cta: #1a7a5a;
+  --green-cta-hover: #22a06b;
+  --green-whatsapp: #25d366;
+  --card-bg: rgba(255, 255, 255, 0.06);
+  --card-border: rgba(212, 184, 150, 0.15);
+  --text-primary: #f0ece4;
+  --text-secondary: rgba(240, 236, 228, 0.65);
+  --text-muted: rgba(240, 236, 228, 0.4);
+
+  /* Tipografia */
+  --font-heading: 'Playfair Display', 'Georgia', serif;
+  --font-body: 'Inter', 'Helvetica Neue', sans-serif;
+
+  /* Transições */
+  --transition-step: 550ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fade: 500ms ease;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  font-family: var(--font-body);
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Container de Slides --- */
+#app-wrapper {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  transition: transform var(--transition-step);
+  will-change: transform;
+}
+
+/* --- Cada etapa ocupa 100vh --- */
+.step {
+  width: 100%;
+  height: 100vh;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: linear-gradient(170deg, var(--bg-dark) 0%, var(--bg-dark-2) 50%, var(--bg-dark-3) 100%);
+}
+
+.step-content {
+  width: 100%;
+  max-width: 420px;
+  padding: 40px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* --- Animação de entrada --- */
+.step .step-content>* {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity var(--transition-fade), transform var(--transition-fade);
+}
+
+.step.active .step-content>* {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Delay escalonado para cada filho */
+.step.active .step-content>*:nth-child(1) {
+  transition-delay: 0.1s;
+}
+
+.step.active .step-content>*:nth-child(2) {
+  transition-delay: 0.2s;
+}
+
+.step.active .step-content>*:nth-child(3) {
+  transition-delay: 0.3s;
+}
+
+.step.active .step-content>*:nth-child(4) {
+  transition-delay: 0.4s;
+}
+
+.step.active .step-content>*:nth-child(5) {
+  transition-delay: 0.5s;
+}
+
+.step.active .step-content>*:nth-child(6) {
+  transition-delay: 0.6s;
+}
+
+.step.active .step-content>*:nth-child(7) {
+  transition-delay: 0.7s;
+}
+
+.step.active .step-content>*:nth-child(8) {
+  transition-delay: 0.8s;
+}
+
+.step.active .step-content>*:nth-child(9) {
+  transition-delay: 0.9s;
+}
+
+/* ============================================================
+   ETAPA 1 — HERO
+   ============================================================ */
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.logo-icon {
+  font-size: 24px;
+  color: var(--accent-gold);
+}
+
+.logo-text {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 3px;
+  color: var(--text-primary);
+  text-transform: uppercase;
+}
+
+/* --- Carousel de Galeria --- */
+.gallery-carousel-container {
+  width: 100%;
+  max-width: 320px;
+  height: 320px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.carousel-track {
+  display: flex;
+  height: 100%;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.carousel-item {
+  min-width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.carousel-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 20px;
+}
+
+.carousel-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.carousel-dots {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.dot.active {
+  background: var(--accent-gold);
+  width: 20px;
+  border-radius: 4px;
+}
+
+.hero-title {
+  font-family: var(--font-heading);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  max-width: 340px;
+}
+
+.hero-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 24px;
+  max-width: 300px;
+}
+
+/* --- Botões CTA --- */
+.btn-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 32px;
+  border: 1.5px solid var(--accent-gold);
+  border-radius: 30px;
+  background: transparent;
+  color: var(--accent-gold);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-cta:active {
+  transform: scale(0.96);
+}
+
+.btn-cta:hover {
+  background: rgba(212, 184, 150, 0.1);
+}
+
+.btn-cta .arrow {
+  transition: transform 0.3s ease;
+}
+
+.btn-cta:hover .arrow {
+  transform: translateX(4px);
+}
+
+/* ============================================================
+   ETAPA 2 — TAMANHOS
+   ============================================================ */
+
+.btn-back {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: none;
+  border: none;
+  color: var(--accent-gold);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.btn-back:hover {
+  opacity: 1;
+}
+
+.back-arrow {
+  font-size: 18px;
+}
+
+.step-label {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.step-title {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 24px;
+}
+
+/* Grade de tamanhos - 2 colunas */
+.size-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.size-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 16px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.size-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(212, 184, 150, 0.08) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.size-card:hover::before,
+.size-card.selected::before {
+  opacity: 1;
+}
+
+.size-card:active {
+  transform: scale(0.97);
+}
+
+.size-card.selected {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 20px rgba(212, 184, 150, 0.15);
+}
+
+.size-card-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 10px;
+  border: 1.5px solid var(--card-border);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.size-card-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--accent-gold);
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.size-name {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.size-price {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--green-cta-hover);
+}
+
+/* ============================================================
+   ETAPA 3 — UPLOAD DE FOTO
+   ============================================================ */
+
+.upload-area {
+  width: 100%;
+  max-width: 320px;
+  min-height: 200px;
+  border: 2px dashed var(--card-border);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: var(--card-bg);
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.upload-area:hover {
+  border-color: var(--accent-gold);
+  background: rgba(212, 184, 150, 0.05);
+}
+
+.upload-area:active {
+  transform: scale(0.98);
+}
+
+.upload-icon {
+  margin-bottom: 16px;
+}
+
+.upload-text {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.image-preview {
+  display: none;
+  width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.upload-area.has-image {
+  border-style: solid;
+  border-color: var(--accent-gold);
+  padding: 8px;
+  min-height: auto;
+}
+
+.btn-continue {
+  margin-top: 8px;
+}
+
+/* ============================================================
+   ETAPA 4 — FINALIZAR
+   ============================================================ */
+
+.finalize-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 28px;
+  max-width: 320px;
+}
+
+.order-summary {
+  width: 100%;
+  max-width: 320px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 28px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 15px;
+}
+
+.summary-row span {
+  color: var(--text-secondary);
+}
+
+.summary-row strong {
+  color: var(--accent-gold);
+  font-weight: 600;
+}
+
+.summary-row+.summary-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Botão WhatsApp */
+.btn-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 36px;
+  background: linear-gradient(135deg, var(--green-cta) 0%, var(--green-cta-hover) 100%);
+  border: none;
+  border-radius: 30px;
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(26, 122, 90, 0.3);
+}
+
+.btn-whatsapp:hover {
+  box-shadow: 0 6px 28px rgba(26, 122, 90, 0.45);
+  transform: translateY(-2px);
+}
+
+.btn-whatsapp:active {
+  transform: scale(0.97) translateY(0);
+}
+
+.whatsapp-icon {
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   LOADING OVERLAY
+   ============================================================ */
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 46, 46, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.loading-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(212, 184, 150, 0.2);
+  border-top-color: var(--accent-gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Botões de Ação nas Etapas */
+.step-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 24px;
+}
+
+.btn-add-more {
+  background: transparent !important;
+  border: 1px solid var(--accent-gold) !important;
+  color: var(--accent-gold) !important;
+  box-shadow: none !important;
+}
+
+.btn-add-more:hover {
+  background: rgba(212, 184, 150, 0.1) !important;
+  transform: translateY(-2px);
+}
+
+/* Carrinho de Compras */
+.cart-list {
+  width: 100%;
+  max-width: 320px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 20px 0;
+  padding-right: 5px;
+}
+
+/* Scrollbar personalizada para o carrinho */
+.cart-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.cart-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cart-list::-webkit-scrollbar-thumb {
+  background: var(--accent-gold);
+  border-radius: 10px;
+}
+
+.cart-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.cart-item-preview {
+  width: 50px;
+  height: 50px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid rgba(212, 184, 150, 0.3);
+}
+
+.cart-item-info {
+  flex: 1;
+}
+
+.cart-item-info span {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.cart-item-info strong {
+  font-size: 15px;
+  color: var(--accent-gold);
+}
+
+.btn-remove-item {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ff4d4d;
+  border: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.btn-remove-item:hover {
+  background: #ef4444;
+  color: white;
+}
+
+.cart-total {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 24px;
+}
+
+.cart-total span {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.cart-total strong {
+  font-size: 22px;
+  color: var(--accent-gold);
+}
+
+/* ============================================================
+   RESPONSIVIDADE — TELAS MAIORES
+   ============================================================ */
+
+@media (min-width: 768px) {
+  .hero-title {
+    font-size: 36px;
+    max-width: 450px;
+  }
+
+  .hero-subtitle {
+    font-size: 16px;
+    max-width: 400px;
+  }
+
+  .step-title {
+    font-size: 28px;
+  }
+
+  .size-grid {
+    gap: 16px;
+    max-width: 400px;
+  }
+
+  .size-card {
+    padding: 20px 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .step-content {
+    padding: -15px -15px;
+    margin-top: -65px;
+  }
+
+  .hero-title {
+    font-size: 20px;
+  }
+
+  .hero-subtitle {
+    font-size: 12px;
+  }
+}

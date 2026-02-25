@@ -1,0 +1,15 @@
+{
+  "name": "new-ksbold",
+  "version": "1.0.0",
+  "main": "admin.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.97.0"
+  }
+}
