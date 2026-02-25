@@ -255,7 +255,8 @@ body {
   font-weight: 500;
   letter-spacing: 0.5px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: ks-pulse-bounce 3s ease-in-out infinite;
 }
 
 .btn-cta:active {
@@ -525,8 +526,9 @@ body {
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 4px 20px rgba(26, 122, 90, 0.3);
+  animation: ks-pulse-bounce 3s ease-in-out infinite;
 }
 
 .btn-whatsapp:hover {
@@ -749,5 +751,124 @@ body {
 
   .hero-subtitle {
     font-size: 12px;
+  }
+}
+
+/* ============================================================
+   CUSTOM NOTIFICATIONS (MODALS)
+   ============================================================ */
+
+.ks-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  padding: 20px;
+}
+
+.ks-modal-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.ks-modal {
+  background: var(--bg-dark-2);
+  border: 1.5px solid var(--accent-gold);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 320px;
+  padding: 32px 24px;
+  text-align: center;
+  transform: scale(0.9) translateY(20px);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.ks-modal-overlay.visible .ks-modal {
+  transform: scale(1) translateY(0);
+}
+
+.ks-modal-icon {
+  width: 50px;
+  height: 50px;
+  background: rgba(212, 184, 150, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  font-size: 24px;
+  color: var(--accent-gold);
+}
+
+.ks-modal-title {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.ks-modal-message {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+
+.ks-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.ks-modal-btn {
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+}
+
+.ks-modal-btn-primary {
+  background: var(--accent-gold);
+  color: var(--bg-dark);
+  border: none;
+}
+
+.ks-modal-btn-primary:active {
+  transform: scale(0.95);
+}
+
+.ks-modal-btn-secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.ks-modal-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+@keyframes ks-pulse-bounce {
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-6px) scale(1.02);
   }
 }

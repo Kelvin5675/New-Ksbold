@@ -20,6 +20,76 @@ try {
     console.error('❌ Erro ao criar Supabase client:', e);
 }
 
+// ======== NOTIFICAÇÕES PREMIUM (CUSTOM MODALS) ========
+
+/**
+ * Mostra um alerta personalizado com tema KSBOLD
+ */
+function showKSAlert(message, title = 'KSBOLD') {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'ks-modal-overlay';
+        overlay.innerHTML = `
+            <div class="ks-modal">
+                <div class="ks-modal-icon">✨</div>
+                <div class="ks-modal-title">${title}</div>
+                <div class="ks-modal-message">${message}</div>
+                <div class="ks-modal-actions">
+                    <button class="ks-modal-btn ks-modal-btn-primary">OK</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        // Trigger animation
+        setTimeout(() => overlay.classList.add('visible'), 10);
+
+        overlay.querySelector('.ks-modal-btn-primary').onclick = () => {
+            overlay.classList.remove('visible');
+            setTimeout(() => {
+                document.body.removeChild(overlay);
+                resolve();
+            }, 300);
+        };
+    });
+}
+
+/**
+ * Mostra um diálogo de confirmação personalizado com tema KSBOLD
+ */
+function showKSConfirm(message, title = 'Confirmar') {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'ks-modal-overlay';
+        overlay.innerHTML = `
+            <div class="ks-modal">
+                <div class="ks-modal-icon">❓</div>
+                <div class="ks-modal-title">${title}</div>
+                <div class="ks-modal-message">${message}</div>
+                <div class="ks-modal-actions">
+                    <button class="ks-modal-btn ks-modal-btn-secondary">Cancelar</button>
+                    <button class="ks-modal-btn ks-modal-btn-primary">Confirmar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        setTimeout(() => overlay.classList.add('visible'), 10);
+
+        const close = (result) => {
+            overlay.classList.remove('visible');
+            setTimeout(() => {
+                document.body.removeChild(overlay);
+                resolve(result);
+            }, 300);
+        };
+
+        overlay.querySelector('.ks-modal-btn-primary').onclick = () => close(true);
+        overlay.querySelector('.ks-modal-btn-secondary').onclick = () => close(false);
+    });
+}
+
+
 // ======== LOGIN ========
 
 /**
@@ -229,9 +299,9 @@ async function savePixelSettings() {
     });
 
     if (!error) {
-        alert('✅ Configuração do Pixel atualizada com sucesso!');
+        showKSAlert('✅ Configuração do Pixel atualizada com sucesso!');
     } else {
-        alert('❌ Erro ao salvar pixel: ' + error.message + '\n\nVerifique se executou o SQL de configuração RLS no Supabase.');
+        showKSAlert('❌ Erro ao salvar pixel: ' + error.message + '\n\nVerifique se executou o SQL de configuração RLS no Supabase.');
     }
 }
 
@@ -246,9 +316,9 @@ async function savePixelFromConfig() {
     if (!error) {
         document.getElementById('pixel-id-input').value = pixelId;
         document.getElementById('pixel-toggle').checked = pixelAtivo;
-        alert('✅ Pixel atualizado com sucesso!');
+        showKSAlert('✅ Configurações de Pixel e Sistema salvas com sucesso!');
     } else {
-        alert('❌ Erro ao salvar: ' + error.message + '\n\nVerifique as políticas RLS no Supabase.');
+        showKSAlert('❌ Erro ao salvar: ' + error.message);
     }
 }
 
@@ -333,9 +403,9 @@ async function savePricesFromConfig() {
     }
 
     if (!hasError) {
-        alert('✅ Preços atualizados com sucesso!');
+        showKSAlert('✅ Preços atualizados com sucesso!');
     } else {
-        alert('❌ Erro ao salvar preços.\n\nVerifique se:\n1. As tabelas foram criadas no Supabase\n2. O RLS está desactivado ou com políticas correctas\n\nVeja o console (F12) para detalhes.');
+        showKSAlert('❌ Erro ao salvar preços.\n\nVerifique se:\n1. As tabelas foram criadas no Supabase\n2. O RLS está desactivado ou com políticas correctas\n\nVeja o console (F12) para detalhes.');
     }
 }
 
@@ -446,7 +516,7 @@ async function updateOrderStatus(orderId, newStatus) {
     });
 
     if (error) {
-        alert('❌ Erro ao atualizar: ' + error.message);
+        showKSAlert('❌ Erro ao atualizar: ' + error.message);
     } else {
         // Atualizar no cache local e recarregar stats
         const order = allOrdersData.find(o => o.id === orderId);
@@ -456,16 +526,16 @@ async function updateOrderStatus(orderId, newStatus) {
 }
 
 async function deleteOrder(orderId) {
-    if (!confirm(`Tem certeza que deseja eliminar o pedido #${orderId}?`)) return;
+    if (!await showKSConfirm(`Tem certeza que deseja eliminar o pedido #${orderId}?`)) return;
 
     const { error } = await safeSupabaseCall('eliminar pedido', async (sb) => {
         return await sb.from('orders').delete().eq('id', orderId);
     });
 
     if (error) {
-        alert('❌ Erro ao eliminar: ' + error.message);
+        showKSAlert('❌ Erro ao eliminar: ' + error.message);
     } else {
-        alert('✅ Pedido eliminado com sucesso!');
+        showKSAlert('✅ Pedido eliminado com sucesso!');
         // Recarregar tudo
         loadRecentOrders();
         loadStats();
@@ -566,8 +636,8 @@ function closeOrderDetail() {
 
 // ======== AUXILIARES MODAL E DOWNLOAD ========
 
-function viewOrderImage(url) {
-    if (!url) { alert('Nenhuma imagem disponível.'); return; }
+async function viewOrderImage(url) {
+    if (!url) { showKSAlert('Nenhuma imagem disponível.'); return; }
     const img = document.getElementById('modal-image');
     img.src = url;
     document.getElementById('image-modal').classList.add('visible');
@@ -581,7 +651,7 @@ function closeImageModal() {
  * Força o download real do ficheiro em vez de apenas abrir
  */
 async function downloadImage(url, filename) {
-    if (!url) { alert('Nenhuma imagem disponível.'); return; }
+    if (!url) { showKSAlert('Nenhuma imagem disponível.'); return; }
 
     try {
         const response = await fetch(url);
@@ -723,7 +793,7 @@ async function handleGalleryUpload(input) {
 
         if (uploadError) {
             console.error('❌ Erro no Storage (Upload):', uploadError);
-            alert('❌ Erro no Storage (Upload): ' + uploadError.message + '\n\nIsso geralmente significa que o Bucket "gallery-images" precisa de políticas de INSERT.');
+            showKSAlert('❌ Erro no Storage (Upload): ' + uploadError.message + '\n\nIsso geralmente significa que o Bucket "gallery-images" precisa de políticas de INSERT.');
             throw uploadError;
         }
 
@@ -739,11 +809,11 @@ async function handleGalleryUpload(input) {
         });
 
         if (insertError) {
-            alert('❌ Erro na Tabela (Database): ' + insertError.message + '\n\nIsso significa que a tabela "gallery" precisa de políticas de INSERT ou RLS desativado.');
+            showKSAlert('❌ Erro na Tabela (Database): ' + insertError.message + '\n\nIsso significa que a tabela "gallery" precisa de políticas de INSERT ou RLS desativado.');
             throw insertError;
         }
 
-        alert('✅ Foto adicionada à galeria com sucesso!');
+        showKSAlert('✅ Foto adicionada à galeria com sucesso!');
         loadGallery();
     } catch (e) {
         console.error('Erro geral no upload da galeria:', e);
@@ -755,7 +825,7 @@ async function handleGalleryUpload(input) {
 }
 
 async function deleteGalleryImage(id, url) {
-    if (!confirm('Tem certeza que deseja excluir esta foto da galeria?')) return;
+    if (!await showKSConfirm('Tem certeza que deseja excluir esta foto da galeria?')) return;
 
     try {
         // 1. Extrair nome do arquivo da URL para deletar no storage
@@ -780,6 +850,6 @@ async function deleteGalleryImage(id, url) {
         loadGallery();
     } catch (e) {
         console.error('Erro ao deletar da galeria:', e);
-        alert('❌ Erro ao deletar: ' + e.message);
+        showKSAlert('❌ Erro ao deletar: ' + e.message);
     }
 }

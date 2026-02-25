@@ -22,6 +22,76 @@ let currentSlide = 0;
 let carouselInterval = null;
 let carrinho = []; // [ {tamanho, preco, file, previewUrl} ]
 
+// ======== NOTIFICAÇÕES PREMIUM (CUSTOM MODALS) ========
+
+/**
+ * Mostra um alerta personalizado com tema KSBOLD
+ */
+function showKSAlert(message, title = 'KSBOLD') {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'ks-modal-overlay';
+        overlay.innerHTML = `
+            <div class="ks-modal">
+                <div class="ks-modal-icon">✨</div>
+                <div class="ks-modal-title">${title}</div>
+                <div class="ks-modal-message">${message}</div>
+                <div class="ks-modal-actions">
+                    <button class="ks-modal-btn ks-modal-btn-primary">OK</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        // Trigger animation
+        setTimeout(() => overlay.classList.add('visible'), 10);
+
+        overlay.querySelector('.ks-modal-btn-primary').onclick = () => {
+            overlay.classList.remove('visible');
+            setTimeout(() => {
+                document.body.removeChild(overlay);
+                resolve();
+            }, 300);
+        };
+    });
+}
+
+/**
+ * Mostra um diálogo de confirmação personalizado com tema KSBOLD
+ */
+function showKSConfirm(message, title = 'Confirmar') {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'ks-modal-overlay';
+        overlay.innerHTML = `
+            <div class="ks-modal">
+                <div class="ks-modal-icon">❓</div>
+                <div class="ks-modal-title">${title}</div>
+                <div class="ks-modal-message">${message}</div>
+                <div class="ks-modal-actions">
+                    <button class="ks-modal-btn ks-modal-btn-secondary">Cancelar</button>
+                    <button class="ks-modal-btn ks-modal-btn-primary">Confirmar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        setTimeout(() => overlay.classList.add('visible'), 10);
+
+        const close = (result) => {
+            overlay.classList.remove('visible');
+            setTimeout(() => {
+                document.body.removeChild(overlay);
+                resolve(result);
+            }, 300);
+        };
+
+        overlay.querySelector('.ks-modal-btn-primary').onclick = () => close(true);
+        overlay.querySelector('.ks-modal-btn-secondary').onclick = () => close(false);
+    });
+}
+
+
 // ======== NAVEGAÇÃO ENTRE ETAPAS ========
 
 /**
@@ -309,6 +379,9 @@ function handleFileSelect(e) {
     };
     reader.readAsDataURL(file);
     uploadedFile = file; // Salvar o arquivo no estado
+
+    // Resetar o valor do input para permitir selecionar o mesmo arquivo novamente/trocar sem bugs
+    e.target.value = '';
 }
 
 /**
@@ -316,7 +389,7 @@ function handleFileSelect(e) {
  */
 function adicionarAoCarrinho() {
     if (!selectedSize || !uploadedFile) {
-        alert('Por favor, selecione um tamanho e envie uma foto.');
+        showKSAlert('Por favor, selecione um tamanho e envie uma foto.');
         return;
     }
 
@@ -347,14 +420,14 @@ function adicionarAoCarrinho() {
     document.getElementById('btn-continue').style.display = 'none';
 
     goToStep(1);
-    alert('✅ Quadro adicionado ao carrinho!');
+    showKSAlert('✅ Quadro adicionado ao carrinho!');
 }
 
 /**
  * Remove um item do carrinho
  */
-function removerDoCarrinho(index) {
-    if (confirm('Deseja remover este quadro do carrinho?')) {
+async function removerDoCarrinho(index) {
+    if (await showKSConfirm('Deseja remover este quadro do carrinho?')) {
         carrinho.splice(index, 1);
         updateSummary();
         if (carrinho.length === 0 && !uploadedFile) {
@@ -384,7 +457,7 @@ async function finalizarPedido() {
     }
 
     if (itensParaProcessar.length === 0) {
-        alert('Seu carrinho está vazio!');
+        showKSAlert('Seu carrinho está vazio!');
         goToStep(1);
         return;
     }
@@ -476,6 +549,9 @@ async function finalizarPedido() {
 /**
  * Carrega e injeta o Meta Pixel se estiver ativo no Supabase
  */
+/**
+ * Carrega e injeta o Meta Pixel se estiver ativo no Supabase
+ */
 async function loadMetaPixel() {
     if (!supabaseClient) return;
 
@@ -487,34 +563,26 @@ async function loadMetaPixel() {
             .single();
 
         if (error || !data) return;
-        if (!data.pixel_ativo || !data.meta_pixel_id) return;
+        if (!data.pixel_ativo || !data.meta_pixel_id) {
+            console.log('🔇 Meta Pixel desativado ou ID ausente.');
+            return;
+        }
 
-        // Injetar script do Meta Pixel no head
         const pixelId = data.meta_pixel_id;
-        const script = document.createElement('script');
-        script.innerHTML = `
-      !function(f,b,e,v,n,t,s)
-      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-      n.queue=[];t=b.createElement(e);t.async=!0;
-      t.src=v;s=b.getElementsByTagName(e)[0];
-      s.parentNode.insertBefore(t,s)}(window,document,'script',
-      'https://connect.facebook.net/en_US/fbevents.js');
-      fbq('init', '${pixelId}');
-      fbq('track', 'PageView');
-    `;
-        document.head.appendChild(script);
 
-        // Noscript fallback
-        const noscript = document.createElement('noscript');
-        const img = document.createElement('img');
-        img.height = 1;
-        img.width = 1;
-        img.style.display = 'none';
-        img.src = `https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1`;
-        noscript.appendChild(img);
-        document.head.appendChild(noscript);
+        // Inicializar Pixel se a função fbq existir (injetada no index.html)
+        if (typeof fbq === 'function') {
+            console.log('📡 Inicializando Meta Pixel:', pixelId);
+            fbq('init', pixelId);
+            fbq('track', 'PageView');
+
+            // Noscript fallback dinâmico (opcional, mas bom ter)
+            const noscript = document.createElement('noscript');
+            noscript.innerHTML = `<img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1"/>`;
+            document.head.appendChild(noscript);
+        } else {
+            console.warn('⚠️ Meta Pixel script base não encontrado no index.html');
+        }
 
     } catch (e) {
         console.warn('Erro ao carregar Meta Pixel:', e);
