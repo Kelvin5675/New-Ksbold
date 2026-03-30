@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Acompanhamento do Pedido — KSBOLD</title>
+
+    <link rel="icon" type="image/jpeg" href="Logo Ksbold.jpg">
+
+    <!-- Google Fonts - Seguindo a identidade da KSbold -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+
+    <!-- CSS Exclusivo para o Chat para não conflitar -->
+    <link rel="stylesheet" href="chat.css">
+
+</head>
+
+<body>
+
+    <!-- App Container Global -->
+    <div class="chat-wrapper">
+
+        <!-- Header do Chat -->
+        <header class="chat-header">
+            <div class="chat-header-info">
+                <div class="logo-icon-mini">✦</div>
+                <div>
+                    <h1 class="chat-title">KSBOLD Care</h1>
+                    <div class="status-text" id="status-text">
+                        <span class="status-dot" id="status-dot"></span>
+                        <span id="status-label">Pedido <span id="header-order-id">#KS-...</span></span>
+                    </div>
+                </div>
+            </div>
+            <!-- Botão para Voltar a loja ou Fechar -->
+            <a href="index.html" class="btn-close-chat">✕</a>
+        </header>
+
+        <!-- Área Principal de Mensagens -->
+        <main class="chat-messages" id="chat-messages-container">
+
+            <!-- Placeholder de Loading -->
+            <div id="loading-history" class="system-message">Carregando histórico seguro...</div>
+
+        </main>
+
+        <!-- Overlay de Onboarding (Nome e Celular) - Aparece se não for identificado ainda -->
+        <div class="onboarding-overlay" id="onboarding-overlay" style="display: none;">
+            <div class="onboarding-card">
+                <h2 class="onboarding-title">Quase lá!</h2>
+                <p class="onboarding-text">Recebemos o seu pedido. Para vincular a fatura e prosseguir, como podemos te
+                    chamar?</p>
+
+                <form id="onboarding-form" onsubmit="submitOnboarding(event)">
+                    <div class="input-group-chat">
+                        <label for="client-name">Qual é o seu nome?</label>
+                        <input type="text" id="client-name" placeholder="Seu nome ou apelido" required
+                            autocomplete="name">
+                    </div>
+
+                    <div class="input-group-chat">
+                        <label for="client-phone">Número com WhatsApp</label>
+                        <input type="tel" id="client-phone" placeholder="+258 8X XXX XXXX" required autocomplete="tel">
+                    </div>
+
+                    <button type="submit" class="btn-submit-onboarding" id="btn-onboarding-submit">Acessar Meu
+                        Pedido</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Barra de Digitação (Oculta até o onboarding terminar) -->
+        <footer class="chat-input-area" id="chat-input-area">
+            <button class="btn-attach" title="Enviar Foto" onclick="openAddFrameModal()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+            </button>
+
+            <div class="input-wrapper">
+                <textarea id="message-input" placeholder="Escreva sua mensagem..." rows="1"
+                    oninput="autoResizeTextarea(this)"></textarea>
+            </div>
+
+            <button class="btn-send" onclick="sendMessage()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </footer>
+
+    </div> <!-- Fim Wrapper -->
+
+    <script src="supabase.min.js"></script>
+    <!-- ========== MODAL: ADICIONAR NOVO QUADRO ========== -->
+    <div class="onboarding-overlay" id="add-frame-modal" style="display:none; opacity:1; background: rgba(0,0,0,0.92);">
+        <div class="onboarding-card">
+            <button class="btn-close-modal" onclick="closeAddFrameModal()"
+                style="position:absolute; top:15px; right:15px; background:none; border:none; color:var(--text-muted); font-size:24px; cursor:pointer;">&times;</button>
+            <h2 class="onboarding-title">Novo Quadro</h2>
+            <p class="onboarding-text">Transforme outra memória agora mesmo.</p>
+
+            <div class="input-group-chat">
+                <label>Escolha o Tamanho</label>
+                <select id="new-frame-size" class="chat-select">
+                    <!-- Populado via JS -->
+                </select>
+            </div>
+
+            <div class="input-group-chat">
+                <label>Sua Foto (Alta Qualidade)</label>
+                <div class="chat-upload-zone" onclick="document.getElementById('new-frame-file').click()">
+                    <input type="file" id="new-frame-file" hidden accept="image/*" onchange="handleNewFrameFile(event)">
+                    <div id="new-frame-preview-container" style="display:none;">
+                        <img id="new-frame-preview" style="max-width:100%; max-height:150px; border-radius:8px;">
+                    </div>
+                    <div id="upload-placeholder-content">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <p style="font-size:12px; margin-top:8px;">Clique para enviar foto</p>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-submit-onboarding" id="btn-confirm-new-frame" onclick="confirmNewFrame()">
+                Confirmar e Adicionar
+            </button>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="chat.js"></script>
+</body>
+
+</html>

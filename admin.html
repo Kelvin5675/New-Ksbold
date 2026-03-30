@@ -111,6 +111,14 @@
                     </svg>
                     Vendas
                 </a>
+                <a href="#" class="nav-item" data-section="mensagens" onclick="switchSection('mensagens', this)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    Mensagens
+                    <span class="badge" id="chat-badge"
+                        style="display:none; background:#ff4444; color:white; border-radius:12px; min-width:18px; height:18px; padding:0 4px; font-size:10px; margin-left:auto; font-weight:bold; display:none; align-items:center; justify-content:center;">0</span>
+                </a>
                 <a href="#" class="nav-item" data-section="galeria" onclick="switchSection('galeria', this)">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -283,6 +291,31 @@
                 </div>
             </div><!-- /section-vendas -->
 
+            <!-- ========== SEÇÃO: MENSAGENS (CRM CHAT) ========== -->
+            <div class="section-content" id="section-mensagens" style="display:none; height: calc(100vh - 80px);">
+                <div class="chat-crm-container">
+                    <!-- Inbox Sidebar (Lista de Pedidos) -->
+                    <div class="chat-sidebar">
+                        <div class="chat-sidebar-header">
+                            <h3>Minha Caixa</h3>
+                            <button onclick="loadChatInbox()" title="Atualizar">🔄</button>
+                        </div>
+                        <div class="chat-inbox-list" id="chat-inbox-list">
+                            <!-- Inserido dinamicamente via JS -->
+                            <p style="padding:20px; color:#999; text-align:center;">Nenhuma conversa ativa.</p>
+                        </div>
+                    </div>
+
+                    <!-- Main Chat Area (Painel Direito) -->
+                    <div class="chat-mainview" id="chat-mainview">
+                        <div class="chat-placeholder">
+                            <span style="font-size:40px; color:var(--accent-color);">💬</span>
+                            <p style="margin-top:10px; color:#999;">Selecione uma conversa para atender.</p>
+                        </div>
+                    </div>
+                </div>
+            </div><!-- /section-mensagens -->
+
             <!-- ========== SEÇÃO: GALERIA ========== -->
             <div class="section-content" id="section-galeria" style="display:none;">
                 <div class="mgmt-card">
@@ -309,6 +342,21 @@
             <!-- ========== SEÇÃO: CONFIGURAÇÕES ========== -->
             <div class="section-content" id="section-config" style="display:none;">
                 <div class="config-grid">
+                    
+                    <!-- WhatsApp Bot Config -->
+                    <div class="mgmt-card" style="grid-column: 1 / -1;">
+                        <h4>WhatsApp Bot (Evolution API)</h4>
+                        <p class="mgmt-desc">Gerencie a conexão e a mensagem de recibo enviada aos clientes.</p>
+                        <label class="form-label-admin">MENSAGEM DE NOVO PEDIDO</label>
+                        <small style="color:#666; display:block; margin-bottom:8px;">Variáveis disponíveis: {nome}, {tamanho}, {preco}, {order_id}</small>
+                        <textarea class="admin-input" id="whatsapp-template-input" rows="4" style="resize:vertical;" placeholder="Olá {nome}! Recebemos o seu pedido..."></textarea>
+                        
+                        <div style="margin-top:15px; display:flex; gap:10px; align-items:center; flex-wrap: wrap;">
+                            <button class="btn-admin-primary" onclick="saveWhatsAppTemplate()">Guardar Mensagem</button>
+                            <button class="btn-admin-outline" id="btn-whatsapp-qr" onclick="showWhatsAppQR()">Gerar QR Code de Conexão WhatsApp</button>
+                        </div>
+                    </div>
+
                     <!-- Pixel Config -->
                     <div class="mgmt-card">
                         <h4>Meta Pixel</h4>
@@ -368,6 +416,8 @@
 
     <!-- Supabase JS CDN -->
     <script src="supabase.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="config.js"></script>
     <script src="admin.js"></script>
 </body>
 

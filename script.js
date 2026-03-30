@@ -3,12 +3,9 @@
    ============================================================ */
 
 // ======== CONFIGURAÇÃO SUPABASE ========
-// IMPORTANTE: Substitua com suas credenciais reais do Supabase
-const SUPABASE_URL = 'https://zqsxmzbshsozggcwvxla.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpxc3htemJzaHNvemdnY3d2eGxhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NzMwODUsImV4cCI6MjA4NzU0OTA4NX0.Neo-VHUaq7Zwk211QLdg-GEMKgyrouJfl7QepTJZCvk';
-const WHATSAPP_NUMBER = '258834355768'; // Número com código do país
+const { SUPABASE_URL, SUPABASE_ANON_KEY, WHATSAPP_NUMBER } = window.KSBOLD_CONFIG || {};
 
-const supabaseClient = window.supabase
+const supabaseClient = (window.supabase && SUPABASE_URL)
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
 
@@ -440,12 +437,11 @@ async function removerDoCarrinho(index) {
 // ======== FINALIZAR PEDIDO ========
 
 /**
- * Cria o pedido no Supabase e abre o WhatsApp
- */
-/**
  * Finaliza o pedido, enviando fotos e criando registros no Supabase
  */
-async function finalizarPedido() {
+async function finalizarPedido(e) {
+    if (e) e.preventDefault();
+
     // Preparar lista de itens para processar
     let itensParaProcessar = [...carrinho];
     if (selectedSize && uploadedFile) {
@@ -505,13 +501,21 @@ async function finalizarPedido() {
                         status: 'Pendente'
                     }]);
 
-                if (orderError) throw orderError;
+                if (orderError) {
+                    console.error("ERRO SUPABASE DE INSERT ORDER:", orderError);
+                    alert("Falha Database: " + (orderError.message || JSON.stringify(orderError)));
+                    throw orderError;
+                }
 
                 orderDetails.push({ id: orderId, tamanho: item.tamanho, preco: item.preco });
                 totalGeral += item.preco;
 
             } catch (e) {
                 console.error(`Erro ao processar item ${i + 1}:`, e);
+                alert(`Erro Crítico na Criação do Item: ` + e.message);
+                // Impede o redirecionamento com OrderInvalido:
+                hideLoading();
+                return;
             }
         }
     }
@@ -529,20 +533,128 @@ async function finalizarPedido() {
         });
     }
 
-    // 3. Montar mensagem unificada para WhatsApp
-    let itemSummary = orderDetails.map(d => `• ${d.tamanho} (ID: ${d.id}): MT ${formatPrice(d.preco)}`).join('\n');
+    // 3. Redirecionar para o Novo Sistema de Chat
 
-    const message = encodeURIComponent(
-        `🖼️ *Novo Pedido KSBOLD (Múltiplos Itens)*\n\n` +
-        `📦 *Carrinho:*\n${itemSummary}\n\n` +
-        `💰 *Total Geral:* MT ${formatPrice(totalGeral)}\n` +
-        `🆔 *Grupo:* ${orderGroupId}\n\n` +
-        `Gostaria de finalizar meu pedido com esses quadros!`
-    );
+    // Salvar itens processados e o ID do Pedido no LocalStorage temporariamente
+    // para carregamento suave na primeira tela de onboarding se necessário
+    localStorage.setItem('ksbold_current_order', orderGroupId);
+    localStorage.setItem('ksbold_order_total', totalGeral);
 
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${message}`, '_blank');
+    // Ir para a URL do Chat PWA com o parâmetro order_id
+    window.location.href = `/chat?order_id=${orderGroupId}`;
 }
 
+/**
+ * Finaliza o pedido, enviando fotos e registros no Supabase,
+ * mass direciona o usuário para o WhatsApp nativo.
+ */
+async function finalizarPedidoComAutomacao(e) {
+    if (e) e.preventDefault();
+
+    const name = document.getElementById('client-name-final').value.trim();
+    const whatsapp = document.getElementById('client-whatsapp-final').value.trim();
+
+    if (!name || !whatsapp) {
+        showKSAlert('Por favor, preencha o seu Nome e WhatsApp para receber o recibo.');
+        return;
+    }
+
+    let itensParaProcessar = [...carrinho];
+    if (selectedSize && uploadedFile) {
+        itensParaProcessar.push({
+            tamanho: selectedSize,
+            preco: selectedPrice,
+            file: uploadedFile
+        });
+    }
+
+    if (itensParaProcessar.length === 0) {
+        showKSAlert('Seu carrinho está vazio!');
+        goToStep(1);
+        return;
+    }
+
+    showLoading(`Processando ${itensParaProcessar.length} quadro(s)...`);
+
+    const orderGroupId = 'KS-' + Math.floor(Math.random() * 9000 + 1000);
+    let totalGeral = 0;
+
+    if (supabaseClient) {
+        for (let i = 0; i < itensParaProcessar.length; i++) {
+            const item = itensParaProcessar[i];
+            const orderId = `${orderGroupId}-${i + 1}`;
+            let imageUrl = '';
+
+            try {
+                // 1. Upload da imagem
+                const fileExt = item.file.name.split('.').pop();
+                const fileName = `${orderId}_${Date.now()}.${fileExt}`;
+
+                const { error: uploadError } = await supabaseClient.storage
+                    .from('order-images').upload(fileName, item.file);
+
+                if (!uploadError) {
+                    const { data: urlData } = supabaseClient.storage
+                        .from('order-images').getPublicUrl(fileName);
+                    imageUrl = urlData.publicUrl;
+                }
+
+                // 2. Criar pedido com dados do cliente
+                const { error: orderError } = await supabaseClient
+                    .from('orders')
+                    .insert([{
+                        id: orderId,
+                        tamanho: item.tamanho,
+                        preco: item.preco,
+                        imagem_url: imageUrl,
+                        status: 'Pendente',
+                        client_name: name,
+                        client_phone: whatsapp
+                    }]);
+
+                if (orderError) throw orderError;
+                totalGeral += item.preco;
+
+            } catch (e) {
+                console.error(e);
+                hideLoading();
+                showKSAlert('Erro ao processar pedido. Tente novamente.');
+                return;
+            }
+        }
+    }
+
+    hideLoading();
+
+    // Pixel tracking
+    if (typeof fbq === 'function') {
+        fbq('track', 'Purchase', { value: totalGeral, currency: 'MZN' });
+    }
+
+    // Sucesso Premium
+    showKSSuccessModal(name, orderGroupId);
+}
+
+function showKSSuccessModal(name, orderId) {
+    const overlay = document.createElement('div');
+    overlay.className = 'ks-modal-overlay';
+    overlay.style.zIndex = "3000";
+    overlay.innerHTML = `
+        <div class="ks-modal" style="text-align:center;">
+            <div class="ks-modal-icon" style="font-size: 50px;">🎉</div>
+            <div class="ks-modal-title">Pedido Confirmado!</div>
+            <div class="ks-modal-message" style="margin-bottom: 20px;">
+                Olá <strong>${name}</strong>, o seu pedido <strong>#${orderId}</strong> foi recebido com sucesso!<br><br>
+                Acabámos de enviar uma mensagem para o seu <strong>WhatsApp</strong> com o recibo e os dados para pagamento.
+            </div>
+            <div class="ks-modal-actions">
+                <button class="ks-modal-btn ks-modal-btn-primary" onclick="location.reload()">Entendido</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.classList.add('visible'), 10);
+}
 
 // ======== META PIXEL DINÂMICO ========
 
@@ -732,4 +844,3 @@ async function trackVisit() {
         console.warn('Falha no rastreio de visita:', e);
     }
 }
-

@@ -3,14 +3,13 @@
    ============================================================ */
 
 // ======== CONFIGURAÇÃO SUPABASE ========
-const SUPABASE_URL = 'https://zqsxmzbshsozggcwvxla.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpxc3htemJzaHNvemdnY3d2eGxhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NzMwODUsImV4cCI6MjA4NzU0OTA4NX0.Neo-VHUaq7Zwk211QLdg-GEMKgyrouJfl7QepTJZCvk';
+const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.KSBOLD_CONFIG || {};
 
 let supabaseClient = null;
 
 // Inicializar Supabase com verificação
 try {
-    if (window.supabase) {
+    if (window.supabase && SUPABASE_URL) {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         console.log('✅ Supabase client criado com sucesso');
     } else {
@@ -157,6 +156,7 @@ function showDashboard() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('admin-dashboard').style.display = 'flex';
     loadDashboardData();
+    initGlobalChatListener(); // Ativar Realtime para notificações e mensagens em tempo real
 }
 
 /**
@@ -188,7 +188,7 @@ function switchSection(sectionId, navEl) {
     document.getElementById('sidebar').classList.remove('open');
 
     if (sectionId === 'vendas') loadAllOrders();
-    if (sectionId === 'config') loadConfigData();
+    if (sectionId === 'config') { loadConfigData(); loadWhatsAppConfig(); }
     if (sectionId === 'galeria') loadGallery();
 
     if (event) event.preventDefault();
@@ -233,7 +233,12 @@ async function loadDashboardData() {
         loadPriceButtons(),
         loadRecentOrders()
     ]);
-    console.log('📊 Dashboard carregado.');
+
+    // Inicia ouvidos do Chat Central (Admin CRM Inbox)
+    initGlobalChatListener();
+    loadChatInbox(true);
+
+    console.log('📊 Dashboard carregado e Chat CRM Active.');
 }
 
 async function loadStats() {
@@ -518,10 +523,29 @@ async function updateOrderStatus(orderId, newStatus) {
     if (error) {
         showKSAlert('❌ Erro ao atualizar: ' + error.message);
     } else {
-        // Atualizar no cache local e recarregar stats
+        // 1. Atualizar no cache local e recarregar stats
         const order = allOrdersData.find(o => o.id === orderId);
         if (order) order.status = newStatus;
         loadStats();
+
+        // 2. Enviar mensagem automática no chat do cliente
+        try {
+            await safeSupabaseCall('enviar notificacao de status no chat', async (sb) => {
+                return await sb.from('messages').insert([{
+                    order_id: orderId,
+                    sender_type: 'system',
+                    content_type: 'text',
+                    content: { text: `📢 Atualização: O seu pedido está agora ${newStatus.toUpperCase()}.` }
+                }]);
+            });
+
+            // Se o chat deste pedido estiver aberto, recarregar
+            const currentPrefix = orderId.split('-').slice(0, 2).join('-');
+            const activePrefix = activeChatOrderId ? activeChatOrderId.split('-').slice(0, 2).join('-') : null;
+            if (activePrefix === currentPrefix) {
+                loadAdminChatHistory(orderId);
+            }
+        } catch (e) { console.error("Erro ao notificar no chat:", e); }
     }
 }
 
@@ -591,6 +615,9 @@ async function openOrderDetail(orderId) {
     const date = new Date(order.created_at).toLocaleString('pt-MZ');
     const statusClass = (order.status || 'pendente').toLowerCase();
 
+    const clientName = order.client_name || 'Não informado';
+    const clientPhone = order.client_phone || 'Não informado';
+
     container.innerHTML = `
         <div class="detail-image-container">
             ${order.imagem_url
@@ -599,6 +626,20 @@ async function openOrderDetail(orderId) {
         </div>
 
         ${otherItemsHtml}
+
+        <div style="background:linear-gradient(135deg, #1a1a2e, #16213e); border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid rgba(212,184,150,0.2);">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#d4b896; margin-bottom:10px; font-weight:600;">👤 DADOS DO CLIENTE</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div>
+                    <div style="font-size:10px; color:#888; text-transform:uppercase;">NOME</div>
+                    <div style="font-size:15px; color:#fff; font-weight:600;">${clientName}</div>
+                </div>
+                <div>
+                    <div style="font-size:10px; color:#888; text-transform:uppercase;">WHATSAPP</div>
+                    <div style="font-size:15px; color:#fff; font-weight:600;">${clientPhone}</div>
+                </div>
+            </div>
+        </div>
 
         <div class="detail-info-grid">
             <div class="detail-info-item">
@@ -626,6 +667,7 @@ async function openOrderDetail(orderId) {
         <div class="detail-actions">
             <button class="btn-detail-view" onclick="viewOrderImage('${order.imagem_url || ''}')">Visualizar Cheio</button>
             <button class="btn-detail-download" onclick="downloadImage('${order.imagem_url || ''}', 'pedido_${order.id}')">Baixar Imagem</button>
+            <button class="btn-detail-download" style="background:linear-gradient(135deg,#d4b896,#b8956a);color:#0a0a0f;" onclick="generateOrderPDF('${order.id}')">📄 Gerar Fatura PDF</button>
         </div>
     `;
 }
@@ -851,5 +893,890 @@ async function deleteGalleryImage(id, url) {
     } catch (e) {
         console.error('Erro ao deletar da galeria:', e);
         showKSAlert('❌ Erro ao deletar: ' + e.message);
+    }
+}
+
+/* ============================================================
+   CHAT CRM LOGIC (ADMIN VIEW)
+   ============================================================ */
+
+let activeChatOrderId = null;
+let adminPresenceChannel = null;
+let adminTypingTimer = null;
+let adminIsTyping = false;
+let adminPollInterval = null;      // Polling de mensagens do chat ativo
+let adminLastMsgTimestamp = null;  // Timestamp da última mensagem vista
+let globalPollInterval = null;     // Polling global para badge
+let lastGlobalMsgCheck = null;     // Timestamp do último check global
+
+// Escuta Mutações Globais em Messages para Atualizar Badge/Inbox
+function initGlobalChatListener() {
+    if (!supabaseClient) return;
+
+    // Inicializar timestamp global
+    lastGlobalMsgCheck = new Date().toISOString();
+
+    // Realtime: atualiza badge e inbox quando chega nova mensagem
+    supabaseClient.channel('global-chat-badge')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
+            const data = payload.new;
+
+            if (data.sender_type === 'client') {
+                const sectionVisible = document.getElementById('section-mensagens')?.style.display !== 'none';
+                if (!sectionVisible || data.order_id !== activeChatOrderId) {
+                    incrementChatBadge();
+                }
+            }
+            // Se a aba de mensagens está visível, recarregar inbox
+            const sectionVisible = document.getElementById('section-mensagens')?.style.display !== 'none';
+            if (sectionVisible) loadChatInbox(false);
+
+            // Se a mensagem pertence ao grupo do chat ativo
+            if (activeChatOrderId && data.sender_type === 'client') {
+                const currentPrefix = activeChatOrderId.split('-').slice(0, 2).join('-');
+                if (data.order_id.startsWith(currentPrefix)) {
+                    document.getElementById('admin-typing-indicator')?.remove();
+                    if (!document.getElementById(data.id)) {
+                        appendAdminMessageUI(data);
+                        scrollAdminChatBottom();
+                    }
+                }
+            }
+        })
+        .subscribe();
+
+    // Polling global de fallback: verifica mensagens novas a cada 8s
+    if (globalPollInterval) clearInterval(globalPollInterval);
+    globalPollInterval = setInterval(async () => {
+        try {
+            const { data: newMsgs } = await supabaseClient
+                .from('messages')
+                .select('order_id, id, sender_type')
+                .eq('sender_type', 'client')
+                .gt('created_at', lastGlobalMsgCheck)
+                .limit(20);
+
+            if (newMsgs && newMsgs.length > 0) {
+                lastGlobalMsgCheck = new Date().toISOString();
+
+                const sectionVisible = document.getElementById('section-mensagens')?.style.display !== 'none';
+
+                // Badge: incrementar por mensagens em pedidos que não estão abertos
+                const outsideOrders = newMsgs.filter(m => m.order_id !== activeChatOrderId);
+                if (outsideOrders.length > 0) {
+                    outsideOrders.forEach(() => incrementChatBadge());
+                }
+
+                // Se a aba está aberta, atualizar inbox
+                if (sectionVisible) loadChatInbox(false);
+
+                // Se há mensagens para o chat ativo, adicionar sem duplicar
+                const activeMsgs = newMsgs.filter(m => m.order_id === activeChatOrderId);
+                if (activeMsgs.length > 0) startAdminChatPolling();
+            }
+        } catch (e) { /* silencioso */ }
+    }, 8000);
+}
+
+function incrementChatBadge() {
+    const badge = document.getElementById('chat-badge');
+    badge.style.display = 'flex';
+    let current = parseInt(badge.textContent || '0');
+    badge.textContent = (current + 1).toString();
+}
+
+// Caso a aba mensagens seja aberta
+document.querySelector('[data-section="mensagens"]').addEventListener('click', () => {
+    const badge = document.getElementById('chat-badge');
+    badge.style.display = 'none';
+    badge.textContent = '0';
+});
+
+// 1. Carregar Lista (Lateral)
+async function loadChatInbox(showLoading = true) {
+    const listEl = document.getElementById('chat-inbox-list');
+    if (!listEl) return;
+
+    if (showLoading) listEl.innerHTML = '<p style="padding:20px; color:#999; text-align:center;">Carregando...</p>';
+
+    try {
+        // Ordena por last_message_at
+        const { data: activeOrders, error } = await safeSupabaseCall('carregar chat inbox', async (sb) => {
+            return await sb.from('orders')
+                .select('id, client_name, client_phone, status, last_message_at, created_at')
+                // Exibe apenas a galera que de fato preencheu algo ou iniciou conversa
+                .not('client_name', 'is', 'null')
+                .order('last_message_at', { ascending: false, nullsFirst: false })
+                .limit(50);
+        });
+
+        if (error) throw error;
+
+        if (!activeOrders || activeOrders.length === 0) {
+            listEl.innerHTML = '<p style="padding:20px; color:#999; text-align:center;">Nenhum atendimento conversacional pendente.</p>';
+            return;
+        }
+
+        // --- Agrupamento por ID de Grupo (Deduplicação) ---
+        const uniqueGroups = new Map();
+        activeOrders.forEach(ord => {
+            const groupId = ord.id.split('-').slice(0, 2).join('-'); // Ex: 'KS-3692'
+            // Como a query já vem ordenada por recência, a primeira vez que vemos o groupId é o pedido mais recente
+            if (!uniqueGroups.has(groupId)) {
+                uniqueGroups.set(groupId, ord);
+            }
+        });
+
+        const deduplicatedOrders = Array.from(uniqueGroups.values());
+
+        let html = '';
+        deduplicatedOrders.forEach(ord => {
+            const name = ord.client_name || 'Desconhecido';
+            let timeStr = '';
+            if (ord.last_message_at) {
+                timeStr = new Date(ord.last_message_at).toLocaleTimeString('pt-MZ', { hour: '2-digit', minute: '2-digit' });
+            } else {
+                timeStr = new Date(ord.created_at).toLocaleDateString('pt-MZ');
+            }
+
+            const isActive = ord.id === activeChatOrderId ? 'active' : '';
+
+            html += `
+                <div class="inbox-item ${isActive}" onclick="openAdminChat('${ord.id}', '${name.replace(/'/g, "\\'").replace(/"/g, "&quot;")}', '${(ord.client_phone || '').replace(/'/g, "\\'")}')">
+                    <div class="inbox-item-header">
+                        <span class="inbox-order">#${ord.id}</span>
+                        <span class="inbox-time">${timeStr}</span>
+                    </div>
+                    <div class="inbox-client-name">${name}</div>
+                    <div class="inbox-preview">${ord.status} &bull; ${ord.client_phone || 'Sem número'}</div>
+                </div>
+            `;
+        });
+
+        listEl.innerHTML = html;
+
+    } catch (err) {
+        if (showLoading) listEl.innerHTML = '<p style="padding:20px; color:red; text-align:center;">Erro ao carregar conversas.</p>';
+        console.error("Inbox load fail:", err);
+    }
+}
+
+// 2. Abrir Conversa Direita
+async function openAdminChat(orderId, clientName, clientPhone) {
+    activeChatOrderId = orderId;
+    loadChatInbox(false);
+
+    // Desconectar canal de Presence anterior se existir
+    if (adminPresenceChannel) {
+        supabaseClient.removeChannel(adminPresenceChannel);
+        adminPresenceChannel = null;
+    }
+
+    const mainView = document.getElementById('chat-mainview');
+    mainView.innerHTML = `
+        <div class="active-chat-header">
+            <div class="active-chat-info">
+                <h3>${clientName} (#${orderId})</h3>
+                <p id="admin-client-status">📞 ${clientPhone || 'Não informado'}</p>
+            </div>
+            <div class="active-chat-actions">
+                <button onclick="generateAndSendInvoice('${orderId}')">🧾 Gerar e Enviar Fatura PDF</button>
+            </div>
+        </div>
+        
+        <div class="admin-messages-area" id="admin-messages-area">
+            <p style="text-align:center; color:#666; font-size:12px; margin-top:40px;">Buscando histórico...</p>
+        </div>
+        
+        <div class="admin-chat-input-area">
+            <button class="btn-attach" onclick="alert('Upload no chat chega na V2')" title="Anexar Arte">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            </button>
+            <input type="text" id="admin-message-input" placeholder="Mensagem padrão de alta fidelidade..." onkeydown="handleAdminChatKey(event)" oninput="onAdminTyping()">
+            <button onclick="sendAdminMessage()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
+        </div>
+    `;
+
+    await loadAdminChatHistory(orderId);
+    startAdminChatPolling(orderId); // Iniciar polling de mensagens para este chat
+
+    // Inicializar Presence para este chat (Usando Prefixo para agrupar múltiplos pedidos)
+    const prefix = orderId.split('-').slice(0, 2).join('-');
+
+    adminPresenceChannel = supabaseClient.channel(`presence_${prefix}`, {
+        config: { presence: { key: 'admin' } }
+    });
+
+    adminPresenceChannel
+        .on('presence', { event: 'sync' }, () => {
+            const state = adminPresenceChannel.presenceState();
+            console.log('Admin Presence State:', state);
+            const clientOnline = state.client && state.client.length > 0;
+            const statusEl = document.getElementById('admin-client-status');
+            if (statusEl) {
+                statusEl.textContent = clientOnline
+                    ? `🟢 ${clientName} está online`
+                    : `📞 ${clientPhone || 'Não informado'}`;
+            }
+        })
+        .on('broadcast', { event: 'typing' }, (payload) => {
+            if (payload.payload?.role === 'client') {
+                showClientTypingInAdmin(payload.payload?.isTyping);
+            }
+        })
+        .subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                await adminPresenceChannel.track({ role: 'admin', order_id: prefix });
+            }
+        });
+}
+
+// 3. Carregar Array de Msgs daquele Order
+async function loadAdminChatHistory(orderId) {
+    const area = document.getElementById('admin-messages-area');
+    if (!area) return;
+
+    try {
+        const prefix = orderId.split('-').slice(0, 2).join('-'); // Ex: 'KS-3692'
+        const { data: msgs, error } = await safeSupabaseCall('carregar historico da conversa', async (sb) => {
+            return await sb.from('messages')
+                .select('*')
+                .like('order_id', `${prefix}%`)
+                .order('created_at', { ascending: true });
+        });
+
+        if (error) throw error;
+        area.innerHTML = '';
+
+        if (msgs.length === 0) {
+            area.innerHTML = '<p style="text-align:center;color:#666; margin-top:20px;">Nenhuma mensagem registrada ainda.</p>';
+        } else {
+            msgs.forEach(msg => appendAdminMessageUI(msg));
+            // Guardar timestamp da última mensagem para o polling
+            adminLastMsgTimestamp = msgs[msgs.length - 1].created_at;
+        }
+        scrollAdminChatBottom();
+
+    } catch (err) {
+        area.innerHTML = '<p style="color:red; text-align:center;">Falha ao puxar chat logs.</p>';
+    }
+}
+
+// Polling de mensagens do chat ativo: busca mensagens novas a cada 3s
+function startAdminChatPolling(orderId) {
+    if (!orderId) orderId = activeChatOrderId;
+    if (!orderId) return;
+
+    if (adminPollInterval) clearInterval(adminPollInterval);
+    adminPollInterval = setInterval(async () => {
+        const area = document.getElementById('admin-messages-area');
+        if (!area || !adminLastMsgTimestamp) return;
+
+        try {
+            const prefix = activeChatOrderId.split('-').slice(0, 2).join('-');
+            const { data: newMsgs } = await supabaseClient
+                .from('messages')
+                .select('*')
+                .like('order_id', `${prefix}%`)
+                .gt('created_at', adminLastMsgTimestamp)
+                .order('created_at', { ascending: true });
+
+            if (newMsgs && newMsgs.length > 0) {
+                // Remover typing indicator se existia
+                document.getElementById('admin-typing-indicator')?.remove();
+
+                newMsgs.forEach(msg => {
+                    if (document.getElementById(msg.id)) return; // já existe
+
+                    // Remover mensagem temporária se for do admin e tiver o mesmo texto
+                    if (msg.sender_type === 'admin') {
+                        const text = msg.content?.text;
+                        if (text) {
+                            document.querySelectorAll('[id^="admin_t_"]').forEach(el => {
+                                if (el.textContent.includes(text)) el.remove();
+                            });
+                        }
+                    }
+
+                    appendAdminMessageUI(msg);
+                });
+                adminLastMsgTimestamp = newMsgs[newMsgs.length - 1].created_at;
+                scrollAdminChatBottom();
+            }
+        } catch (e) { /* silencioso */ }
+    }, 3000);
+}
+
+// 4. Enviar Mensagem do Painel
+async function sendAdminMessage() {
+    if (!activeChatOrderId) return;
+    const input = document.getElementById('admin-message-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = ''; // Limpa pra UX imediata
+
+    const tempId = 'admin_t_' + Date.now();
+    const tempMsg = {
+        id: tempId,
+        sender_type: 'admin',
+        content_type: 'text',
+        content: { text: text },
+        created_at: new Date().toISOString()
+    };
+
+    appendAdminMessageUI(tempMsg);
+    scrollAdminChatBottom();
+
+    try {
+        const { error } = await safeSupabaseCall('enviar mensagem do admin', async (sb) => {
+            return await sb.from('messages').insert([{
+                order_id: activeChatOrderId,
+                sender_type: 'admin',
+                content_type: 'text',
+                content: { text: text }
+            }]);
+        });
+
+        if (error) throw error;
+
+        // Atualiza a Last Message no Order
+        safeSupabaseCall('atualiza last message order', async (sb) => {
+            return await sb.from('orders').update({ last_message_at: new Date().toISOString() }).eq('id', activeChatOrderId);
+        });
+
+        // Faz sidebar pular pra cima (silenciosamente)
+        setTimeout(() => loadChatInbox(false), 500);
+
+    } catch (err) {
+        console.error("Falha ao responder:", err);
+        showKSAlert("Erro: A mensagem pode não ter sido enviada.");
+        input.value = text;
+        document.getElementById(tempId)?.remove();
+    }
+}
+
+function handleAdminChatKey(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        sendAdminMessage();
+    }
+}
+
+// 5. Auxiliares UI
+function appendAdminMessageUI(msg) {
+    const area = document.getElementById('admin-messages-area');
+    if (!area) return;
+
+    if (msg.sender_type === 'system') {
+        const d = document.createElement('div');
+        d.className = 'admin-system-msg';
+        d.id = msg.id;
+        d.textContent = msg.content?.text || 'Notificação Sistema';
+        area.appendChild(d);
+        return;
+    }
+
+    const isClient = (msg.sender_type === 'client');
+    const row = document.createElement('div');
+    row.className = `admin-msg-row ${isClient ? 'client' : 'admin'}`;
+    row.id = msg.id;
+
+    const timeFmt = new Date(msg.created_at).toLocaleTimeString('pt-MZ', { hour: '2-digit', minute: '2-digit' });
+
+    let cHtml = '';
+
+    if (msg.content_type === 'invoice') {
+        const url = msg.content?.url || '#';
+        cHtml = `
+            <div style="background:#1a1a1a; border:1px solid rgba(212,184,150,0.3); border-radius:10px; padding:14px; text-align:center;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d4b896" stroke-width="2" style="margin-bottom:8px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                <div style="font-weight:bold; color:#d4b896; margin-bottom:4px;">Fatura Oficial KSBOLD</div>
+                <a href="${url}" target="_blank" style="display:inline-block; margin-top:8px; padding:6px 12px; background:#d4b896; color:#000; text-decoration:none; border-radius:4px; font-size:11px; font-weight:600;">Abrir PDF</a>
+            </div>
+        `;
+    } else {
+        cHtml = msg.content?.text?.replace(/\n/g, '<br>') || '';
+    }
+
+    // Cor das bolhas: cliente = azul escuro visível, admin = dourado
+    const bubbleStyle = isClient
+        ? 'background:#1e3a5f; color:#e8f4ff;'  // Azul para mensagens do cliente
+        : 'background:#d4b896; color:#111;';     // Dourado para mensagens do admin
+
+    row.innerHTML = `
+        <div class="admin-msg-bubble" style="${bubbleStyle}">
+            ${cHtml}
+            <div style="font-size:9px; text-align:right; margin-top:4px; opacity:0.6;">${timeFmt}</div>
+        </div>
+    `;
+    area.appendChild(row);
+}
+
+function showClientTypingInAdmin(typing) {
+    const area = document.getElementById('admin-messages-area');
+    if (!area) return;
+
+    let indicator = document.getElementById('admin-typing-indicator');
+
+    if (typing) {
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'admin-typing-indicator';
+            indicator.className = 'admin-msg-row client';
+            indicator.innerHTML = `
+                <div class="admin-msg-bubble" style="background:#1e3a5f; color:#e8f4ff; font-style:italic; opacity:0.7;">
+                    a escrever
+                    <span style="display:inline-flex;gap:2px;margin-left:4px;">
+                        <span style="animation:typingBounce 1.2s infinite">●</span>
+                        <span style="animation:typingBounce 1.2s infinite 0.2s">●</span>
+                        <span style="animation:typingBounce 1.2s infinite 0.4s">●</span>
+                    </span>
+                </div>
+            `;
+            area.appendChild(indicator);
+            scrollAdminChatBottom();
+        }
+    } else {
+        indicator?.remove();
+    }
+}
+
+function onAdminTyping() {
+    if (!adminPresenceChannel) return;
+
+    if (!adminIsTyping) {
+        adminIsTyping = true;
+        adminPresenceChannel.send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: { role: 'admin', isTyping: true }
+        });
+    }
+
+    clearTimeout(adminTypingTimer);
+    adminTypingTimer = setTimeout(() => {
+        adminIsTyping = false;
+        adminPresenceChannel.send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: { role: 'admin', isTyping: false }
+        });
+    }, 1500);
+}
+
+function scrollAdminChatBottom() {
+    const area = document.getElementById('admin-messages-area');
+    if (area) area.scrollTop = area.scrollHeight;
+}
+
+// 6. GERADOR DE PDF REAL E INTEGRAÇÃO
+async function generateAndSendInvoice(orderId) {
+    if (!await showKSConfirm("Deseja gerar a Fatura KSBOLD Oficial agora e enviar no chat deste cliente?")) return;
+
+    showKSAlert("Gerando fatura... aguarde.");
+
+    try {
+        // 1. Puxar Todos os Pedidos do mesmo Grupo (KS-XXXX)
+        const groupPrefix = activeChatOrderId.split('-').slice(0, 2).join('-'); // Pega 'KS-1362' de 'KS-1362-1'
+
+        const { data: allOrders, error: ordersErr } = await safeSupabaseCall('get all group orders', async sb => {
+            return await sb.from('orders')
+                .select('*')
+                .like('id', `${groupPrefix}%`)
+                .order('id', { ascending: true });
+        });
+
+        if (ordersErr || !allOrders || allOrders.length === 0) throw new Error("Não foi possível carregar os pedidos do grupo.");
+
+        // Dados do cliente (usar do primeiro pedido)
+        const primaryOrder = allOrders[0];
+
+        // Setup jsPDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        // Estilo e Cores da Marca KSBOLD
+        const primaryColor = [10, 46, 46]; // #0a2e2e
+        const goldColor = [212, 184, 150]; // #d4b896
+
+        // Cabeçalho Premium
+        doc.setFillColor(...primaryColor);
+        doc.rect(0, 0, 210, 40, 'F');
+
+        doc.setTextColor(...goldColor);
+        doc.setFontSize(24);
+        doc.setFont("helvetica", "bold");
+        doc.text("KSBOLD", 15, 25);
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text("A Arte Transformada em Quadros.", 15, 32);
+
+        // Info Fatura
+        doc.setTextColor(...primaryColor);
+        doc.setFontSize(18);
+        doc.setFont("helvetica", "bold");
+        doc.text("FATURA OFICIAL", 15, 55);
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100);
+        doc.text(`Fatura Nº: ${groupPrefix}`, 15, 65);
+        doc.text(`Data: ${new Date().toLocaleDateString('pt-MZ')}`, 15, 70);
+
+        // Info Cliente
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(0);
+        doc.text("Cliente:", 120, 55);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80);
+        doc.text(`Nome: ${primaryOrder.client_name || 'Consumidor Final'}`, 120, 62);
+        doc.text(`Contato: ${primaryOrder.client_phone || 'Não inf.'}`, 120, 67);
+
+        // Tabela Itens
+        doc.setDrawColor(...goldColor);
+        doc.setLineWidth(0.5);
+        doc.line(15, 80, 195, 80);
+
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(0);
+        doc.text("Descrição do Item", 15, 88);
+        doc.text("ID / Tamanho", 100, 88);
+        doc.text("Valor", 175, 88);
+
+        doc.line(15, 93, 195, 93);
+
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80);
+
+        let yTable = 100;
+        let totalGeral = 0;
+
+        allOrders.forEach(order => {
+            doc.text("Quadro Foam board", 15, yTable);
+            const displaySize = order.size || order.tamanho || 'Tam. Padrão';
+            doc.text(`${order.id} (${displaySize})`, 100, yTable);
+            doc.text(`MT ${Number(order.price || order.preco || 0).toLocaleString('pt-MZ')}`, 175, yTable);
+
+            totalGeral += Number(order.price || order.preco || 0);
+            yTable += 10;
+
+            // Se a tabela ficar muito longa, jsPDF precisaria de nova página (simplificado p/ agora)
+        });
+
+        // Totais e Detalhes
+        doc.line(15, yTable, 195, yTable);
+        yTable += 10;
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...primaryColor);
+        doc.text("TOTAL A PAGAR:", 120, yTable);
+        doc.text(`MT ${totalGeral.toLocaleString('pt-MZ')}`, 170, yTable);
+
+        yTable += 25;
+
+        // Info Pagamentos (Atualizado)
+        doc.setFillColor(245, 245, 245);
+        doc.rect(15, yTable, 180, 35, 'F');
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        doc.text("DADOS PARA PAGAMENTO (E-MOLA / MKESH):", 20, yTable + 10);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80);
+        doc.text("Titular: KELVIN EDILSON", 20, yTable + 18);
+        doc.text("e-Mola: 869312874", 20, yTable + 24);
+        doc.text("m-Kesh: 834355768", 20, yTable + 30);
+
+        // Rodapé
+        doc.setFontSize(8);
+        doc.text("Nota: Comprovativos devem ser enviados diretamente neste Chat.", 105, 280, null, null, "center");
+
+        // 2. Transforma o PDF em Blob
+        const pdfBlob = doc.output('blob');
+
+        // 3. Fazer Upload para o Supabase Storage (reaproveitando o bucket pub 'gallery-images')
+        const filePath = `invoices/${activeChatOrderId}_${Date.now()}.pdf`;
+        const { error: uploadError } = await supabaseClient.storage
+            .from('gallery-images')
+            .upload(filePath, pdfBlob, {
+                contentType: 'application/pdf',
+                upsert: true
+            });
+
+        if (uploadError) throw uploadError;
+
+        // 4. Pegar URL Pública
+        const { data: publicUrlData } = supabaseClient.storage.from('gallery-images').getPublicUrl(filePath);
+        const finalUrl = publicUrlData.publicUrl;
+
+        // 5. Inserir a Fatura no Histórico do Realtime
+        await safeSupabaseCall('insert invoice chat msg', async sb => {
+            return await sb.from('messages').insert([{
+                order_id: activeChatOrderId,
+                sender_type: 'admin',
+                content_type: 'invoice',
+                content: { url: finalUrl, text: "Sua fatura de compra atualizada." }
+            }]);
+        });
+
+        showKSAlert("✅ Fatura Gerada e Enviada para a Timeline do Cliente.");
+        loadAdminChatHistory(activeChatOrderId);
+
+    } catch (err) {
+        console.error("Erro Fatura:", err);
+        showKSAlert("❌ Ocorreu um erro gerando o PDF: " + err.message);
+    }
+}
+
+// ======== WHATSAPP BOT CONFIG ========
+
+async function loadWhatsAppConfig() {
+    const textarea = document.getElementById('whatsapp-template-input');
+    if (!textarea) return;
+
+    const { data, error } = await safeSupabaseCall('carregar template whatsapp', async (sb) => {
+        return await sb.from('bot_settings').select('*').eq('key', 'whatsapp_template').single();
+    });
+
+    if (!error && data && data.value) {
+        textarea.value = data.value;
+    } else {
+        // Template padrão se nada existir no banco
+        textarea.value = `🎉 *Parabéns, {nome}!* 🎉\n\nRecebemos o seu pedido de quadros na *KSBOLD* com sucesso!\n\n📦 *Pedido:* #{order_id}\n🖼️ *Tamanho:* {tamanho}\n💰 *Valor:* MT {preco}\n\n━━━━━━━━━━━━━━━━━━━━━━\n💳 *DADOS PARA PAGAMENTO:*\n- *e-Mola:* 869312874\n- *m-Kesh:* 834355768\n━━━━━━━━━━━━━━━━━━━━━━\n\nPor favor, envie o comprovativo de pagamento aqui para iniciarmos a produção.`;
+    }
+}
+
+async function saveWhatsAppTemplate() {
+    const textarea = document.getElementById('whatsapp-template-input');
+    if (!textarea) return;
+
+    const template = textarea.value.trim();
+    if (!template) {
+        showKSAlert('A mensagem não pode estar vazia.');
+        return;
+    }
+
+    const { error } = await safeSupabaseCall('salvar template whatsapp', async (sb) => {
+        return await sb.from('bot_settings').upsert({ key: 'whatsapp_template', value: template }, { onConflict: 'key' });
+    });
+
+    if (!error) {
+        showKSAlert('✅ Mensagem do WhatsApp atualizada com sucesso!\n\nO bot vai usar esta nova mensagem no próximo pedido.');
+    } else {
+        showKSAlert('❌ Erro ao salvar: ' + error.message + '\n\nCertifique-se de que a tabela "bot_settings" existe no Supabase.');
+    }
+}
+
+async function showWhatsAppQR() {
+    const btn = document.getElementById('btn-whatsapp-qr');
+    btn.textContent = 'Carregando QR Code...';
+    btn.disabled = true;
+
+    try {
+        const apiUrl = 'https://ksbold-evolution-api.onrender.com';
+        const apiKey = 'ksbold-secreta-1234';
+        const instance = 'ksbold-loja';
+
+        // Verificar status de conexão
+        const statusRes = await fetch(`${apiUrl}/instance/connectionState/${instance}`, {
+            headers: { 'apikey': apiKey }
+        });
+        const statusData = await statusRes.json();
+
+        if (statusData?.instance?.state === 'open') {
+            showKSAlert('✅ O WhatsApp já está conectado e ativo!\n\nNão precisa gerar novo QR Code.');
+            btn.textContent = 'Gerar QR Code de Conexão WhatsApp';
+            btn.disabled = false;
+            return;
+        }
+
+        // Solicitar QR Code
+        const qrRes = await fetch(`${apiUrl}/instance/connect/${instance}`, {
+            headers: { 'apikey': apiKey }
+        });
+        const qrData = await qrRes.json();
+
+        if (qrData?.base64) {
+            const overlay = document.createElement('div');
+            overlay.className = 'ks-modal-overlay';
+            overlay.innerHTML = `
+                <div class="ks-modal" style="max-width:400px;text-align:center;">
+                    <div class="ks-modal-title">📱 Escaneie com o WhatsApp</div>
+                    <div class="ks-modal-message" style="margin-bottom:15px;">
+                        Abra o WhatsApp no celular → Menu (⋮) → Aparelhos Conectados → Conectar.
+                    </div>
+                    <img src="${qrData.base64}" style="width:280px; height:280px; border-radius:12px; border:2px solid #d4b896;" alt="QR Code WhatsApp">
+                    <div class="ks-modal-actions" style="margin-top:15px;">
+                        <button class="ks-modal-btn ks-modal-btn-primary" id="btn-close-qr">Fechar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            setTimeout(() => overlay.classList.add('visible'), 10);
+
+            document.getElementById('btn-close-qr').onclick = () => {
+                overlay.classList.remove('visible');
+                setTimeout(() => document.body.removeChild(overlay), 300);
+            };
+        } else {
+            showKSAlert('⚠️ Não foi possível gerar o QR Code.\n\nVerifique se a Evolution API está online no Render.');
+        }
+    } catch (e) {
+        console.error('Erro QR:', e);
+        showKSAlert('❌ Falha ao conectar à Evolution API: ' + e.message);
+    }
+
+    btn.textContent = 'Gerar QR Code de Conexão WhatsApp';
+    btn.disabled = false;
+}
+
+// ======== GERAR FATURA PDF DO PEDIDO ========
+
+async function generateOrderPDF(orderId) {
+    // Buscar dados do pedido
+    const { data: order, error } = await safeSupabaseCall('buscar pedido para PDF', async (sb) => {
+        return await sb.from('orders').select('*').eq('id', orderId).single();
+    });
+
+    if (error || !order) {
+        showKSAlert('❌ Erro ao buscar dados do pedido.');
+        return;
+    }
+
+    // Buscar outros itens do mesmo grupo
+    const groupMatch = order.id.match(/(KS-\d+)-(\d+)/);
+    let allItems = [order];
+    let totalGeral = Number(order.preco || 0);
+
+    if (groupMatch) {
+        const groupId = groupMatch[1];
+        const { data: groupItems } = await safeSupabaseCall('buscar grupo para PDF', async (sb) => {
+            return await sb.from('orders').select('*').ilike('id', `${groupId}-%`);
+        });
+
+        if (groupItems && groupItems.length > 1) {
+            allItems = groupItems;
+            totalGeral = groupItems.reduce((sum, o) => sum + Number(o.preco || 0), 0);
+        }
+    }
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        const clientName = order.client_name || 'N/A';
+        const clientPhone = order.client_phone || 'N/A';
+        const date = new Date(order.created_at).toLocaleDateString('pt-MZ', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        });
+        const groupId = groupMatch ? groupMatch[1] : order.id;
+
+        // === HEADER ===
+        doc.setFillColor(10, 10, 15);
+        doc.rect(0, 0, 210, 45, 'F');
+
+        doc.setTextColor(212, 184, 150);
+        doc.setFontSize(28);
+        doc.setFont('helvetica', 'bold');
+        doc.text('KSBOLD', 20, 28);
+
+        doc.setFontSize(10);
+        doc.setTextColor(150, 150, 150);
+        doc.text('Fine Art Studio', 20, 36);
+
+        doc.setFontSize(16);
+        doc.setTextColor(212, 184, 150);
+        doc.text('FATURA', 160, 28);
+
+        // === INFO DO PEDIDO ===
+        let y = 60;
+        doc.setFontSize(10);
+        doc.setTextColor(80, 80, 80);
+
+        doc.setFont('helvetica', 'bold');
+        doc.text('FATURA PARA:', 20, y);
+        doc.text('DETALHES:', 120, y);
+        y += 7;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(40, 40, 40);
+        doc.text(clientName, 20, y);
+        doc.text(`Pedido: #${groupId}`, 120, y);
+        y += 6;
+        doc.text(`WhatsApp: ${clientPhone}`, 20, y);
+        doc.text(`Data: ${date}`, 120, y);
+        y += 6;
+        doc.text(`Status: ${order.status || 'Pendente'}`, 120, y);
+
+        // === TABELA DE ITENS ===
+        y += 15;
+        doc.setFillColor(212, 184, 150);
+        doc.rect(20, y, 170, 10, 'F');
+
+        doc.setTextColor(10, 10, 15);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.text('ITEM', 25, y + 7);
+        doc.text('TAMANHO', 80, y + 7);
+        doc.text('VALOR (MT)', 145, y + 7);
+
+        y += 14;
+        doc.setTextColor(40, 40, 40);
+        doc.setFont('helvetica', 'normal');
+
+        allItems.forEach((item, idx) => {
+            if (idx % 2 === 0) {
+                doc.setFillColor(245, 245, 245);
+                doc.rect(20, y - 4, 170, 9, 'F');
+            }
+            doc.text(`Quadro ${idx + 1} (#${item.id})`, 25, y + 2);
+            doc.text(item.tamanho || 'N/A', 80, y + 2);
+            doc.text(`MT ${Number(item.preco || 0).toFixed(2)}`, 145, y + 2);
+            y += 10;
+        });
+
+        // === TOTAL ===
+        y += 5;
+        doc.setDrawColor(212, 184, 150);
+        doc.line(20, y, 190, y);
+        y += 10;
+
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(10, 10, 15);
+        doc.text('TOTAL:', 120, y);
+        doc.setTextColor(212, 184, 150);
+        doc.text(`MT ${totalGeral.toFixed(2)}`, 150, y);
+
+        // === DADOS DE PAGAMENTO ===
+        y += 20;
+        doc.setFillColor(240, 235, 228);
+        doc.roundedRect(20, y, 170, 30, 3, 3, 'F');
+
+        doc.setFontSize(10);
+        doc.setTextColor(40, 40, 40);
+        doc.setFont('helvetica', 'bold');
+        doc.text('DADOS PARA PAGAMENTO:', 25, y + 10);
+        doc.setFont('helvetica', 'normal');
+        doc.text('e-Mola: 869312874', 25, y + 18);
+        doc.text('m-Kesh: 834355768', 25, y + 25);
+
+        // === FOOTER ===
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text('KSBOLD Fine Art Studio — Mozambique', 105, 280, { align: 'center' });
+        doc.text('Obrigado pela sua compra!', 105, 285, { align: 'center' });
+
+        // Salvar/Download
+        doc.save(`Fatura_KSBOLD_${groupId}.pdf`);
+        showKSAlert(`✅ Fatura gerada com sucesso!\n\nFicheiro: Fatura_KSBOLD_${groupId}.pdf`);
+
+    } catch (err) {
+        console.error('Erro PDF:', err);
+        showKSAlert('❌ Erro ao gerar PDF: ' + err.message);
     }
 }

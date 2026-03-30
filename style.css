@@ -50,6 +50,31 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* --- Scrollbar Elegante (Global) --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-gold);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-light);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-gold) rgba(0, 0, 0, 0.1);
+}
+
 /* --- Container de Slides --- */
 #app-wrapper {
   width: 100%;
@@ -625,7 +650,7 @@ body {
 }
 
 .cart-list::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .cart-list::-webkit-scrollbar-thumb {
