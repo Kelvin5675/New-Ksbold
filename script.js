@@ -18,6 +18,7 @@ let uploadedImageUrl = null;
 let currentSlide = 0;
 let carouselInterval = null;
 let carrinho = []; // [ {tamanho, preco, file, previewUrl} ]
+let mapaPrecosGlobal = {}; // { 'A4': 120, ... }
 
 // ======== NOTIFICAÇÕES PREMIUM (CUSTOM MODALS) ========
 
@@ -241,14 +242,12 @@ function resetCarouselTimer(total) {
 
 // ======== CARREGAR PREÇOS DO SUPABASE ========
 
-/**
- * Busca os preços da tabela 'prices' e renderiza os cards de tamanho
- */
 async function loadPrices() {
     const grid = document.getElementById('size-grid');
+    if (!grid) return;
 
     // Preços padrão (fallback se Supabase não estiver configurado)
-    let prices = [
+    let pricesArr = [
         { tamanho: 'A0', preco: 600.00 },
         { tamanho: 'A1', preco: 380.00 },
         { tamanho: 'A2', preco: 250.00 },
@@ -257,7 +256,6 @@ async function loadPrices() {
         { tamanho: 'A5', preco: 80.00 }
     ];
 
-    // Tentar buscar do Supabase
     if (supabaseClient) {
         try {
             const { data, error } = await supabaseClient
@@ -266,31 +264,25 @@ async function loadPrices() {
                 .order('tamanho');
 
             if (!error && data && data.length > 0) {
-                prices = data;
+                pricesArr = data;
             }
         } catch (e) {
-            console.warn('Supabase não configurado, usando preços padrão.', e);
+            console.warn('Usando preços padrão.', e);
         }
     }
 
-    // Renderizar cards
     grid.innerHTML = '';
-    prices.forEach(item => {
+    mapaPrecosGlobal = {};
+    pricesArr.forEach(item => {
+        mapaPrecosGlobal[item.tamanho] = item.preco;
         const card = document.createElement('div');
         card.className = 'size-card';
-        card.setAttribute('data-size', item.tamanho);
-        card.setAttribute('data-price', item.preco);
         card.innerHTML = `
-      <div class="size-card-icon">
-        <svg viewBox="0 0 24 24">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M3 16l5-5 4 4 4-6 5 7"/>
-        </svg>
-      </div>
-      <div class="size-name">${item.tamanho}</div>
-      <div class="size-price">MT ${formatPrice(item.preco)}</div>
-    `;
-        card.addEventListener('click', () => selectSize(item.tamanho, item.preco, card));
+            <div class="size-card-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 16l5-5 4 4 4-6 5 7"/></svg></div>
+            <div class="size-name">${item.tamanho}</div>
+            <div class="size-price">MT ${formatPrice(item.preco)}</div>
+        `;
+        card.onclick = () => selectSize(item.tamanho, item.preco, card);
         grid.appendChild(card);
     });
 }
@@ -741,31 +733,33 @@ function updateSummary() {
 
     // 1. Itens já no carrinho
     carrinho.forEach((item, index) => {
-        total += item.preco;
+        const preco = item.preco || mapaPrecosGlobal[item.tamanho] || 0;
+        total += Number(preco);
         container.innerHTML += `
             <div class="cart-item">
                 <img src="${item.previewUrl}" class="cart-item-preview" alt="Miniatura">
                 <div class="cart-item-info">
                     <span>Quadro ${index + 1} (${item.tamanho})</span>
-                    <strong>MT ${formatPrice(item.preco)}</strong>
+                    <strong>MT ${formatPrice(preco)}</strong>
                 </div>
                 <button class="btn-remove-item" onclick="removerDoCarrinho(${index})">×</button>
             </div>
         `;
     });
 
-    // 2. Item atual (se houver e não estiver no carrinho ainda)
+    // 2. Item atual (em configuração)
     if (selectedSize && uploadedFile) {
-        const currentPrice = currentSizes[selectedSize];
-        total += currentPrice;
+        const previewUrl = document.getElementById('image-preview').src;
+        const precoAtual = selectedPrice || mapaPrecosGlobal[selectedSize] || 0;
+        total += Number(precoAtual);
         container.innerHTML += `
-            <div class="cart-item current-item" style="border-color: var(--accent-gold); background: rgba(212, 184, 150, 0.05);">
-                <img src="${URL.createObjectURL(uploadedFile)}" class="cart-item-preview" alt="Miniatura">
+            <div class="cart-item current-item" style="border: 1.5px solid var(--accent-gold); background: rgba(212, 184, 150, 0.05);">
+                <img src="${previewUrl}" class="cart-item-preview" alt="Miniatura">
                 <div class="cart-item-info">
-                    <span>Novo Quadro (${selectedSize})</span>
-                    <strong>MT ${formatPrice(currentPrice)}</strong>
+                    <span>Quadro ${carrinho.length + 1} (${selectedSize})</span>
+                    <strong>MT ${formatPrice(precoAtual)}</strong>
                 </div>
-                <span style="font-size: 10px; color: var(--accent-gold); position: absolute; top: 5px; right: 10px;">Configurando...</span>
+                <span class="badge-atual" style="font-size: 9px; color: var(--accent-gold); position: absolute; top: 4px; right: 8px; text-transform: uppercase; font-weight: 700;">Atual</span>
             </div>
         `;
     }
@@ -775,7 +769,7 @@ function updateSummary() {
     }
 
     if (carrinho.length === 0 && (!selectedSize || !uploadedFile)) {
-        container.innerHTML = '<p style="text-align:center; color:#999; font-size:14px; margin:20px 0;">Seu carrinho está vazio.</p>';
+        container.innerHTML = '<p style="text-align:center; color:#999; font-size:13px; margin:20px 0;">O seu carrinho está vazio.</p>';
     }
 }
 
@@ -784,7 +778,7 @@ function adicionarNovoQuadro() {
     if (selectedSize && uploadedFile) {
         carrinho.push({
             tamanho: selectedSize,
-            preco: currentSizes[selectedSize],
+            preco: mapaPrecosGlobal[selectedSize] || 0,
             file: uploadedFile,
             previewUrl: URL.createObjectURL(uploadedFile)
         });

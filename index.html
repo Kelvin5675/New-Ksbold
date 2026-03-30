@@ -153,30 +153,25 @@
           <strong>MT 0,00</strong>
         </div>
 
-        <button type="button" class="btn-add-more" onclick="adicionarNovoQuadro()" 
-          style="width: 100%; padding: 12px; border: 1.5px solid #d4b896; border-radius: 30px; background: transparent; color: #d4b896; font-weight: 500; cursor: pointer; margin-bottom: 20px;">
+        <!--<button type="button" class="btn-add-more" onclick="adicionarNovoQuadro()">
           + Adicionar Outro Quadro
-        </button>
+        </button>-->
 
         <!-- Formulário de Contacto para Recibo -->
-        <div class="contact-form-area" style="margin-top: 25px; text-align: left;">
-          <p
-            style="font-size: 13px; color: #666; margin-bottom: 12px; border-left: 3px solid #d4b896; padding-left: 10px;">
+        <div class="contact-form-area">
+          <p>
             Insira os dados abaixo para receber o seu **Recibo Digital** e detalhes de pagamento via WhatsApp:
           </p>
-          <div style="margin-bottom: 15px;">
-            <input type="text" id="client-name-final" placeholder="Digite o seu Nome "
-              style="width: 100%; padding: 12px; border: 1px solid #eee; border-radius: 8px; font-size: 14px; outline: none;">
+          <div class="form-group">
+            <input type="text" id="client-name-final" placeholder="Digite o seu Nome">
           </div>
-          <div style="margin-bottom: 15px;">
-            <input type="tel" id="client-whatsapp-final" placeholder="Digite o seu número com WhatsApp (ex: 84...)"
-              style="width: 100%; padding: 12px; border: 1px solid #eee; border-radius: 8px; font-size: 14px; outline: none;">
+          <div class="form-group">
+            <input type="tel" id="client-whatsapp-final" placeholder="Digite o seu número com WhatsApp (ex: 84...)">
           </div>
         </div>
 
         <!-- Botão Finalizar Único (Com Automação) -->
-        <button type="button" class="btn-whatsapp" id="btn-finalize-auto" onclick="finalizarPedidoComAutomacao(event)"
-          style="margin-top: 10px; background: linear-gradient(135deg, #10c200cb 0%, #008708cb 100%); color: #fff; border: none; font-weight: 700; height: 55px; border-radius: 12px; box-shadow: 0 4px 15px rgba(212, 184, 150, 0.3);">
+        <button type="button" class="btn-whatsapp" id="btn-finalize-auto" onclick="finalizarPedidoComAutomacao(event)">
           Confirmar Pedido
         </button>
 

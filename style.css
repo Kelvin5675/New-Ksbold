@@ -99,11 +99,33 @@ body {
 .step-content {
   width: 100%;
   max-width: 420px;
-  padding: 40px 20px 24px;
+  padding: 30px 20px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+}
+
+/* Versão compacta para Passo Final (Dieta Extrema) */
+.step-4 .step-content {
+  padding: 10px 15px 15px;
+}
+
+.step-4 .step-title {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.step-4 .finalize-text {
+  font-size: 11px;
+  line-height: 1.4;
+  margin-bottom: 12px;
+  opacity: 0.8;
+}
+
+.step-4 .step-label {
+  margin-bottom: 5px;
+  font-size: 9px;
 }
 
 /* --- Animação de entrada --- */
@@ -623,10 +645,18 @@ body {
 }
 
 .btn-add-more {
+  width: 100%;
+  max-width: 320px;
+  padding: 10px;
+  border: 1.5px solid var(--accent-gold) !important;
+  border-radius: 30px;
   background: transparent !important;
-  border: 1px solid var(--accent-gold) !important;
   color: var(--accent-gold) !important;
-  box-shadow: none !important;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 12px;
+  font-size: 13px;
+  transition: all 0.3s;
 }
 
 .btn-add-more:hover {
@@ -638,9 +668,9 @@ body {
 .cart-list {
   width: 100%;
   max-width: 320px;
-  max-height: 240px;
+  max-height: 140px;
   overflow-y: auto;
-  margin: 20px 0;
+  margin: 5px 0;
   padding-right: 5px;
 }
 
@@ -719,9 +749,9 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 0;
+  padding: 10px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 24px;
+  margin-bottom: 15px;
 }
 
 .cart-total span {
@@ -896,4 +926,108 @@ body {
   50% {
     transform: translateY(-6px) scale(1.02);
   }
+}
+
+/* ==========================================
+   KSBOLD - ESTILOS COMPACTOS ETAPA 4 
+   (DIETA EXTREMA E CONTROLES DE FORMULÁRIO)
+=========================================== */
+
+.step-4 .step-title {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.step-4 .finalize-text {
+  font-size: 11px;
+  line-height: 1.4;
+  margin-bottom: 12px;
+  max-width: 90%;
+  opacity: 0.8;
+}
+
+.step-4 .step-content {
+  padding: 10px 15px 15px;
+  margin-top: 65px;
+}
+
+.btn-add-more {
+  width: 100%;
+  max-width: 320px;
+  padding: 10px;
+  border: 1.5px solid var(--accent-gold) !important;
+  border-radius: 30px;
+  background: transparent !important;
+  color: var(--accent-gold) !important;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 15px;
+  font-size: 13px;
+  transition: all 0.3s ease;
+  display: block;
+}
+
+.btn-add-more:hover {
+  background: rgba(212, 184, 150, 0.1) !important;
+  transform: translateY(-2px);
+}
+
+.contact-form-area {
+  width: 100%;
+  max-width: 320px;
+  text-align: left;
+  margin-top: 10px;
+}
+
+.contact-form-area p {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 12px;
+  border-left: 3px solid var(--accent-gold);
+  padding-left: 10px;
+  line-height: 1.4;
+}
+
+.form-group {
+  margin-bottom: 10px;
+}
+
+.contact-form-area input {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.3s;
+}
+
+.contact-form-area input:focus {
+  border-color: var(--accent-gold);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-whatsapp {
+  width: 100%;
+  max-width: 320px;
+  height: 50px;
+  margin-top: 10px;
+  background: linear-gradient(135deg, #10c200cb 0%, #008708cb 100%);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 15px;
+  box-shadow: 0 4px 15px rgba(16, 194, 0, 0.2);
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-whatsapp:active {
+  transform: scale(0.98);
 }

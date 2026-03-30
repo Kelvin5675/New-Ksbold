@@ -11,16 +11,28 @@ if sys.stdout.encoding != 'utf-8':
 from supabase import create_client, Client
 
 # --- CONFIGURAÇÕES KSBOLD (Variáveis de Ambiente) ---
-# No Render/Vercel, configure estas chaves nas 'Environment Variables'
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://zqsxmzbshsozggcwvxla.supabase.co")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "") # NUNCA deixe a chave de serviço/admin no código!
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "") 
 WHATSAPP_API_URL = os.getenv("WHATSAPP_API_URL", "https://ksbold-evolution-api.onrender.com/message/sendText/ksbold-loja")
 EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY", "ksbold-secreta-1234")
 
-if not SUPABASE_KEY:
-    print("⚠️ ERRO: SUPABASE_KEY não encontrada nas variáveis de ambiente!")
+# Verificação Crítica de Chaves
+erros = []
+if not SUPABASE_KEY: erros.append("SUPABASE_KEY")
+if not SUPABASE_URL: erros.append("SUPABASE_URL")
+if not EVOLUTION_API_KEY: erros.append("EVOLUTION_API_KEY")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+if erros:
+    print(f"❌ ERRO FATAL: Faltam variáveis de ambiente: {', '.join(erros)}")
+    print("👉 Por favor, configure estas chaves no painel do Render (Environment Settings).")
+    sys.exit(1)
+
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    print("✅ Conectado ao Supabase com sucesso.")
+except Exception as e:
+    print(f"❌ Erro ao inicializar cliente Supabase: {e}")
+    sys.exit(1)
 
 def enviar_whatsapp(numero, mensagem):
     """
