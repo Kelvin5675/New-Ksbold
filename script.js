@@ -729,53 +729,84 @@ function hideLoading() {
 // ======== ATUALIZAR RESUMO DO PEDIDO ========
 
 /**
- * Atualiza as informações do resumo na etapa 4
- */
-/**
  * Atualiza as informações do resumo na etapa 4 (Carrinho)
  */
 function updateSummary() {
-    const cartList = document.getElementById('cart-list');
-    const totalPriceEl = document.getElementById('cart-total-price');
-    if (!cartList || !totalPriceEl) return;
-
-    cartList.innerHTML = '';
+    const container = document.getElementById('cart-list');
+    const totalContainer = document.querySelector('#cart-total strong');
+    if (!container) return;
+    
+    container.innerHTML = '';
     let total = 0;
 
     // 1. Itens já no carrinho
     carrinho.forEach((item, index) => {
-        const itemEl = document.createElement('div');
-        itemEl.className = 'cart-item';
-        itemEl.innerHTML = `
-            <img src="${item.previewUrl}" class="cart-item-preview" alt="Miniatura">
-            <div class="cart-item-info">
-                <span>Quadro ${index + 1} (${item.tamanho})</span>
-                <strong>MT ${formatPrice(item.preco)}</strong>
-            </div>
-            <button class="btn-remove-item" onclick="removerDoCarrinho(${index})">×</button>
-        `;
-        cartList.appendChild(itemEl);
         total += item.preco;
+        container.innerHTML += `
+            <div class="cart-item">
+                <img src="${item.previewUrl}" class="cart-item-preview" alt="Miniatura">
+                <div class="cart-item-info">
+                    <span>Quadro ${index + 1} (${item.tamanho})</span>
+                    <strong>MT ${formatPrice(item.preco)}</strong>
+                </div>
+                <button class="btn-remove-item" onclick="removerDoCarrinho(${index})">×</button>
+            </div>
+        `;
     });
 
     // 2. Item atual (se houver e não estiver no carrinho ainda)
     if (selectedSize && uploadedFile) {
-        const previewUrl = document.getElementById('image-preview').src;
-        const itemEl = document.createElement('div');
-        itemEl.className = 'cart-item';
-        itemEl.innerHTML = `
-            <img src="${previewUrl}" class="cart-item-preview" alt="Miniatura">
-            <div class="cart-item-info">
-                <span>Quadro ${carrinho.length + 1} (${selectedSize})</span>
-                <strong>MT ${formatPrice(selectedPrice)}</strong>
+        const currentPrice = currentSizes[selectedSize];
+        total += currentPrice;
+        container.innerHTML += `
+            <div class="cart-item current-item" style="border-color: var(--accent-gold); background: rgba(212, 184, 150, 0.05);">
+                <img src="${URL.createObjectURL(uploadedFile)}" class="cart-item-preview" alt="Miniatura">
+                <div class="cart-item-info">
+                    <span>Novo Quadro (${selectedSize})</span>
+                    <strong>MT ${formatPrice(currentPrice)}</strong>
+                </div>
+                <span style="font-size: 10px; color: var(--accent-gold); position: absolute; top: 5px; right: 10px;">Configurando...</span>
             </div>
-            <div style="font-size: 10px; color: #d4b896; margin-top: 4px; border: 1px solid #d4b896; padding: 2px 4px; border-radius: 4px;">Atual</div>
         `;
-        cartList.appendChild(itemEl);
-        total += selectedPrice;
     }
 
-    totalPriceEl.textContent = `MT ${formatPrice(total)}`;
+    if (totalContainer) {
+        totalContainer.innerText = `MT ${formatPrice(total)}`;
+    }
+
+    if (carrinho.length === 0 && (!selectedSize || !uploadedFile)) {
+        container.innerHTML = '<p style="text-align:center; color:#999; font-size:14px; margin:20px 0;">Seu carrinho está vazio.</p>';
+    }
+}
+
+function adicionarNovoQuadro() {
+    // Se tem um item sendo configurado, coloca no carrinho primeiro
+    if (selectedSize && uploadedFile) {
+        carrinho.push({
+            tamanho: selectedSize,
+            preco: currentSizes[selectedSize],
+            file: uploadedFile,
+            previewUrl: URL.createObjectURL(uploadedFile)
+        });
+        
+        // Limpa seleção para o próximo
+        selectedSize = null;
+        uploadedFile = null;
+        document.querySelectorAll('.size-card').forEach(c => c.classList.remove('selected'));
+        const uploadArea = document.querySelector('.upload-area');
+        if (uploadArea) {
+            uploadArea.classList.remove('has-image');
+            uploadArea.innerHTML = `
+                <div class="upload-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></div>
+                <div class="upload-text">Toque para carregar foto</div>
+                <div class="upload-hint">Formatos: JPG, PNG ou HEIC</div>
+                <img src="" class="image-preview" id="image-preview">
+            `;
+        }
+    }
+    
+    // Volta para escolha do tamanho
+    goToStep(1);
 }
 
 

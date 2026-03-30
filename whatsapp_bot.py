@@ -45,64 +45,72 @@ def enviar_whatsapp(numero, mensagem):
     except Exception as e:
         print(f"❌ Erro ao enviar: {e}")
 
-def processar_pedido(pedido):
+def processar_grupo(prefix, itens):
     """
-    Formata a mensagem de parabéns e detalhes do pedido.
-    Lê o template do banco de dados (editável pelo Admin).
+    Consolida múltiplos itens do mesmo pedido em uma única mensagem.
     """
-    numero_raw = str(pedido.get('client_phone', '')).strip()
-    # Adicionar o código de país (258 Moçambique) se faltar
+    # 1. Tentar travar TODOS os itens do grupo de forma atômica
+    ids = [item['id'] for item in itens]
+    try:
+        lock_res = supabase.table("orders").update({"notificado": True}).in_("id", ids).eq("notificado", False).execute()
+        
+        # Se nenhum item foi travado com sucesso por este bot, sai
+        if not lock_res.data:
+            return
+            
+        # Consideramos apenas os itens que conseguimos travar
+        itens_travados = lock_res.data
+        ids_sucesso = [o['id'] for o in itens_travados]
+        print(f"🔒 Bloqueados {len(ids_sucesso)} itens do pedido {prefix}. Consolidando...")
+        
+    except Exception as e:
+        print(f"❌ Erro ao tentar reservar grupo {prefix}: {e}")
+        return
+
+    # 2. Preparar dados consolidados
+    primeiro = itens_travados[0]
+    nome = primeiro.get('client_name', 'cliente')
+    numero_raw = str(primeiro.get('client_phone', '')).strip()
+    
     if numero_raw.startswith('8') and len(numero_raw) == 9:
         numero_formatado = f"258{numero_raw}"
     else:
         numero_formatado = numero_raw.replace('+', '')
 
-    nome = pedido.get('client_name', 'cliente')
-    order_id = pedido.get('id', 'N/A')
-    tamanho = pedido.get('tamanho', 'N/A')
-    preco = pedido.get('preco', 0)
-    
-    # Tentar carregar template personalizado do banco de dados
+    lista_quadros = ""
+    total = 0
+    for i, item in enumerate(itens_travados):
+        t = item.get('tamanho', 'N/A')
+        p = item.get('preco', 0)
+        total += p
+        lista_quadros += f"- Quadro {i+1}: {t} (MT {p:.2f})\n"
+
+    # 3. Tentar carregar template
+    msg = ""
     try:
         result = supabase.table("bot_settings").select("value").eq("key", "whatsapp_template").execute()
         if result.data and result.data[0].get('value'):
             template = result.data[0]['value']
             msg = template.replace('{nome}', nome)
-            msg = msg.replace('{order_id}', str(order_id))
-            msg = msg.replace('{tamanho}', str(tamanho))
-            msg = msg.replace('{preco}', f"{preco:.2f}")
-            print("📝 Usando template personalizado do Admin.")
+            msg = msg.replace('{order_id}', prefix)
+            msg = msg.replace('{tamanho}', ", ".join([o.get('tamanho','N/A') for o in itens_travados]))
+            msg = msg.replace('{preco}', f"{total:.2f}")
         else:
-            raise Exception("Nenhum template encontrado, usando padrão.")
-    except Exception as e:
-        print(f"⚠️ Template padrão será usado: {e}")
+            raise Exception("Sem template configurado")
+    except:
         msg = f"🎉 *Parabéns, {nome}!* 🎉\n\n"
-        msg += f"Recebemos o seu pedido de quadros na *KSBOLD* com sucesso!\n\n"
-        msg += f"📦 *Pedido:* #{order_id}\n"
-        msg += f"🖼️ *Tamanho:* {tamanho}\n"
-        msg += f"💰 *Valor:* MT {preco:.2f}\n\n"
+        msg += f"Recebemos o seu pedido na *KSBOLD* com sucesso!\n\n"
+        msg += f"📦 *Pedido:* #{prefix}\n"
+        msg += f"🖼️ *Itens:*\n{lista_quadros}\n"
+        msg += f"💰 *VALOR TOTAL:* MT {total:.2f}\n\n"
         msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
         msg += "💳 *DADOS PARA PAGAMENTO:*\n"
         msg += "- *e-Mola:* 869312874\n"
         msg += "- *m-Kesh:* 834355768\n"
         msg += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        msg += "Por favor, envie o comprovativo de pagamento aqui para iniciarmos a produção.\n"
-        msg += "O seu recibo PDF também será gerado e enviado em breve."
-    
-    # --- TRAVA DE DUPLICIDADE (ATÔMICA) ---
-    # Tenta marcar como notificado apenas se ainda não estiver (Check-and-Set)
-    try:
-        lock_res = supabase.table("orders").update({"notificado": True}).eq("id", order_id).eq("notificado", False).execute()
-        
-        if not lock_res.data:
-            print(f"🚫 Pedido #{order_id} já foi processado por outra instância. Ignorando.")
-            return
+        msg += "Por favor, envie o comprovativo aqui para iniciarmos a produção."
 
-        print(f"🔒 Pedido #{order_id} reservado com sucesso. Enviando mensagem...")
-        enviar_whatsapp(numero_formatado, msg)
-        
-    except Exception as e:
-        print(f"❌ Erro ao tentar reservar pedido: {e}")
+    enviar_whatsapp(numero_formatado, msg)
 
 def monitorar_pedidos():
     """
@@ -113,14 +121,23 @@ def monitorar_pedidos():
     
     while True:
         try:
-            # Busca pedidos pendentes que ainda não foram notificados
-            query = supabase.table("orders").select("*").eq("status", "Pendente").eq("notificado", False).order("created_at", desc=True).limit(5).execute()
+            # Busca todos os pedidos pendentes não notificados
+            query = supabase.table("orders").select("*").eq("status", "Pendente").eq("notificado", False).execute()
             
             if query.data:
-                for pedido in query.data:
-                    processar_pedido(pedido)
+                # Agrupar por prefixo (ex: KS-1234)
+                grupos = {}
+                for item in query.data:
+                    parts = str(item['id']).split('-')
+                    if len(parts) >= 2:
+                        prefix = f"{parts[0]}-{parts[1]}"
+                        if prefix not in grupos: grupos[prefix] = []
+                        grupos[prefix].append(item)
+                
+                for prefix, itens in grupos.items():
+                    processar_grupo(prefix, itens)
             
-            time.sleep(10) # Verifica a cada 10 segundos (para não gastar recursos)
+            time.sleep(10)
         except Exception as e:
             print(f"⚠️ Erro no monitor: {e}")
             time.sleep(20)
