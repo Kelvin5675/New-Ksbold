@@ -4,7 +4,8 @@
 ALTER TABLE public.orders 
 ADD COLUMN IF NOT EXISTS client_name text NULL,
 ADD COLUMN IF NOT EXISTS client_phone text NULL,
-ADD COLUMN IF NOT EXISTS last_message_at timestamp with time zone NULL;
+ADD COLUMN IF NOT EXISTS last_message_at timestamp with time zone NULL,
+ADD COLUMN IF NOT EXISTS notificado boolean DEFAULT false;
 
 -- 2. Criar a Tabela messages
 CREATE TABLE IF NOT EXISTS public.messages (

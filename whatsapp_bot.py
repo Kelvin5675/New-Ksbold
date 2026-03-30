@@ -89,7 +89,20 @@ def processar_pedido(pedido):
         msg += "Por favor, envie o comprovativo de pagamento aqui para iniciarmos a produção.\n"
         msg += "O seu recibo PDF também será gerado e enviado em breve."
     
-    enviar_whatsapp(numero_formatado, msg)
+    # --- TRAVA DE DUPLICIDADE (ATÔMICA) ---
+    # Tenta marcar como notificado apenas se ainda não estiver (Check-and-Set)
+    try:
+        lock_res = supabase.table("orders").update({"notificado": True}).eq("id", order_id).eq("notificado", False).execute()
+        
+        if not lock_res.data:
+            print(f"🚫 Pedido #{order_id} já foi processado por outra instância. Ignorando.")
+            return
+
+        print(f"🔒 Pedido #{order_id} reservado com sucesso. Enviando mensagem...")
+        enviar_whatsapp(numero_formatado, msg)
+        
+    except Exception as e:
+        print(f"❌ Erro ao tentar reservar pedido: {e}")
 
 def monitorar_pedidos():
     """
@@ -100,14 +113,12 @@ def monitorar_pedidos():
     
     while True:
         try:
-            # Busca o último pedido pendente que ainda não foi processado
-            query = supabase.table("orders").select("*").eq("status", "Pendente").order("created_at", desc=True).limit(1).execute()
+            # Busca pedidos pendentes que ainda não foram notificados
+            query = supabase.table("orders").select("*").eq("status", "Pendente").eq("notificado", False).order("created_at", desc=True).limit(5).execute()
             
             if query.data:
-                pedido = query.data[0]
-                if pedido['id'] != last_processed_id:
+                for pedido in query.data:
                     processar_pedido(pedido)
-                    last_processed_id = pedido['id']
             
             time.sleep(10) # Verifica a cada 10 segundos (para não gastar recursos)
         except Exception as e:
