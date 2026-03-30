@@ -1,0 +1,22 @@
+# Dependências
+node_modules/
+
+# Python / Bot (repositório separado)
+whatsapp_bot.py
+connect_whatsapp.py
+requirements.txt
+qrcode_whatsapp.png
+
+# Ambiente / IDE
+.env
+.env.*
+!.env.template
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Artifacts
+*.pyc
+__pycache__/

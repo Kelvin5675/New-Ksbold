@@ -138,9 +138,14 @@
             </nav>
 
             <!-- Info do usuário logado -->
-            <div class="sidebar-user">
-                <small>Logado como</small>
-                <strong id="logged-user-email">admin@ksbold.com</strong>
+            <div class="sidebar-user" style="display: flex; flex-direction: column; gap: 8px;">
+                <div>
+                    <small style="display: block; opacity: 0.7;">Logado como</small>
+                    <strong id="logged-user-email">admin@ksbold.com</strong>
+                </div>
+                <button onclick="handleLogout()" style="background: none; border: 1px solid rgba(255,255,255,0.2); color: #ff6b6b; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.3s; width: fit-content;">
+                    SAIR DO PAINEL
+                </button>
             </div>
         </aside>
 
@@ -164,9 +169,27 @@
                 </div>
             </div>
 
-            <!-- ========== SEÇÃO: GERAL ========== -->
+            <!-- ========== SEÇÃO: GERAL (DASHBOARD) ========== -->
             <div class="section-content" id="section-geral">
+                
+                <div class="dashboard-header-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                    <h3 style="font-family: 'Playfair Display', serif; font-size: 24px; margin: 0;">Desempenho da Loja</h3>
+                    
+                    <div class="filter-wrapper">
+                        <label for="stats-filter" style="font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; margin-right: 10px; letter-spacing: 0.5px;">Filtrar por:</label>
+                        <div class="ks-select-wrapper">
+                            <select id="stats-filter" onchange="loadStats(this.value)">
+                                <option value="all">Todo o Tempo</option>
+                                <option value="today">Hoje</option>
+                                <option value="week">Esta Semana</option>
+                                <option value="month">Este Mês</option>
+                            </select>
+                            <span class="ks-select-arrow">▼</span>
+                        </div>
+                    </div>
+                </div>
 
+                <div class="stats-grid">
                 <!-- Cards de estatísticas -->
                 <div class="stats-row">
                     <div class="stat-card">
@@ -187,12 +210,20 @@
                     </div>
                     <div class="stat-card stat-card-accent">
                         <div class="stat-info">
-                            <small class="stat-label">Active Users</small>
-                            <h3 class="stat-value" id="stat-users">—</h3>
-                            <span class="stat-change">REAL-TIME TRACKING</span>
+                            <small class="stat-label">Pessoas Online <span id="online-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-left:6px;vertical-align:middle;transition:all 0.3s;box-shadow:0 0 5px rgba(0,0,0,0.2);animation:ks-pulse 2s infinite; --pulse-color: rgba(239, 68, 68, 0.7);"></span></small>
+                            <h3 class="stat-value" id="stat-users">0</h3>
+                            <span class="stat-change">TEMPO REAL</span>
                         </div>
                         <div class="stat-icon">👥</div>
                     </div>
+
+                    <style>
+                        @keyframes ks-pulse {
+                            0% { transform: scale(0.95); box-shadow: 0 0 0 0 var(--pulse-color); }
+                            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+                            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+                        }
+                    </style>
                 </div>
 
                 <!-- Cards de gerenciamento -->
@@ -263,18 +294,25 @@
                     </div>
                 </div>
 
+            </div><!-- /stats-grid -->
             </div><!-- /section-geral -->
 
             <!-- ========== SEÇÃO: VENDAS ========== -->
             <div class="section-content" id="section-vendas" style="display:none;">
                 <div class="orders-section">
-                    <div class="orders-header">
-                        <h3>Todos os Pedidos</h3>
+                    <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 class="section-title" style="margin:0;">Todos os Pedidos</h2>
+                        <div id="bulk-actions" style="display: none; align-items: center; gap: 10px; background: #fff1f1; padding: 5px 15px; border-radius: 8px; border: 1px solid #ffcccc;">
+                            <span style="font-size: 12px; color: #c44;">Selecionados: <strong id="selected-count">0</strong></span>
+                            <button onclick="deleteSelectedOrders()" style="background: #ff4444; color: #fff; border: none; padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">ELIMINAR SELECIONADOS</button>
+                        </div>
                     </div>
-                    <div class="orders-table-wrapper">
+
+                    <div class="orders-table-container">
                         <table class="orders-table">
                             <thead>
                                 <tr>
+                                    <th style="width: 40px;"><input type="checkbox" id="select-all-orders" onclick="toggleSelectAll(this)"></th>
                                     <th>ID PEDIDO</th>
                                     <th>TAMANHO</th>
                                     <th>PREÇO</th>
@@ -382,6 +420,19 @@
                         </div>
                         <button class="btn-admin-primary" onclick="savePricesFromConfig()">Salvar Preços</button>
                     </div>
+
+                    <!-- Danger Zone -->
+                    <div class="mgmt-card" style="border: 1px solid #ffcccc; background: #fff5f5;">
+                        <h4 style="color: #c44;">⚠️ Zona de Perigo</h4>
+                        <p class="mgmt-desc">Ações irreversíveis para limpeza do sistema antes do lançamento oficial.</p>
+                        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                            <button class="btn-admin-outline" style="border-color: #ff4444; color: #ff4444; background: #fff;" onclick="resetSystemData()">
+                                Limpar Todos os Pedidos e Mensagens
+                            </button>
+                            <small style="color: #999;">Isso apagará permanentemente todos os registros de vendas (testes).</small>
+                        </div>
+                    </div>
+
                 </div>
             </div><!-- /section-config -->
 

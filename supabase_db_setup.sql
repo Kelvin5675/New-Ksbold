@@ -38,6 +38,9 @@ ON public.orders FOR INSERT WITH CHECK (true);
 CREATE POLICY "Permitir update de dados do cliente (Onboarding)"
 ON public.orders FOR UPDATE USING (true);
 
+CREATE POLICY "Permitir exclusao de pedidos para Admin"
+ON public.orders FOR DELETE USING (true);
+
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Permitir Select de mensagens do próprio chat"
@@ -68,3 +71,10 @@ ON public.bot_settings FOR SELECT USING (true);
 
 CREATE POLICY "Permitir escrita em bot_settings"
 ON public.bot_settings FOR ALL USING (true);
+
+-- 5. Inserir configurações padrão da Evolution API (credenciais movidas do frontend)
+INSERT INTO public.bot_settings (key, value) VALUES
+  ('evolution_api_url', 'https://ksbold-evolution-api.onrender.com'),
+  ('evolution_api_key', 'ksbold-secreta-1234'),
+  ('evolution_instance', 'ksbold-loja')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();

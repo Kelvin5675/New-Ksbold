@@ -844,3 +844,21 @@ async function trackVisit() {
         console.warn('Falha no rastreio de visita:', e);
     }
 }
+
+// ======== PRESENÇA ONLINE (REALTIME) ========
+(function initPresence() {
+    if (!supabaseClient) return;
+    try {
+        const visitorId = 'v_' + Math.random().toString(36).substr(2, 9);
+        const channel = supabaseClient.channel('online-users', {
+            config: { presence: { key: visitorId } }
+        });
+        channel.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                channel.track({ type: 'visitor', joined_at: new Date().toISOString() });
+            }
+        });
+    } catch (e) {
+        console.warn('Presença online não iniciada:', e);
+    }
+})();

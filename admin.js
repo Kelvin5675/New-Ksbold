@@ -12,6 +12,47 @@ try {
     if (window.supabase && SUPABASE_URL) {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         console.log('✅ Supabase client criado com sucesso');
+
+        // ======== MONITORAR VISITANTES ONLINE (REALTIME PRESENCE) ========
+        const presenceChannel = supabaseClient.channel('online-users');
+        
+        presenceChannel
+            .on('presence', { event: 'sync' }, () => {
+                const state = presenceChannel.presenceState();
+                const count = Object.keys(state).length;
+                console.log('👥 Presença sincronizada. Online agora:', count);
+                updateOnlineCount(count);
+            })
+            .on('presence', { event: 'join', filter: { type: 'visitor' } }, ({ key, newPresences }) => {
+                console.log('👋 Novo visitante entrou:', key, newPresences);
+            })
+            .on('presence', { event: 'leave', filter: { type: 'visitor' } }, ({ key, leftPresences }) => {
+                console.log('🏃 Visitante saiu:', key, leftPresences);
+            });
+
+        presenceChannel.subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ Inscrito no canal Realtime: online-users');
+            } else {
+                console.warn('⚠️ Status do canal Realtime:', status);
+            }
+        });
+
+        function updateOnlineCount(count) {
+            const statEl = document.getElementById('stat-users');
+            const dotEl = document.getElementById('online-dot');
+            if (statEl) statEl.textContent = count;
+            if (dotEl) {
+                const isOnline = count > 0;
+                dotEl.style.background = isOnline ? '#22c55e' : '#ef4444';
+                dotEl.style.setProperty('--pulse-color', isOnline ? 'rgba(34, 197, 94, 0.7)' : 'rgba(239, 68, 68, 0.7)');
+                dotEl.title = isOnline ? `${count} visitante(s) no site` : 'Nenhum visitante no momento';
+            }
+        }
+
+        // Estado inicial
+        const statEl = document.getElementById('stat-users');
+        if (statEl) statEl.textContent = 'Sincronizando...';
     } else {
         console.error('❌ Supabase JS não carregou. Verifique a conexão de internet.');
     }
@@ -155,8 +196,53 @@ async function handleLogin(e) {
 function showDashboard() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('admin-dashboard').style.display = 'flex';
+    
+    // Salvar sessão por 1 hora
+    const email = document.getElementById('logged-user-email').textContent;
+    if (email && email !== '...') {
+        localStorage.setItem('ksbold_admin_session', JSON.stringify({
+            email: email,
+            timestamp: Date.now()
+        }));
+    }
+
     loadDashboardData();
     initGlobalChatListener(); // Ativar Realtime para notificações e mensagens em tempo real
+}
+
+/**
+ * Verifica se há uma sessão ativa e válida (1 hora)
+ */
+function checkSession() {
+    const sessionStr = localStorage.getItem('ksbold_admin_session');
+    if (!sessionStr) return;
+
+    try {
+        const session = JSON.parse(sessionStr);
+        const oneHour = 60 * 60 * 1000;
+        const now = Date.now();
+
+        if (now - session.timestamp < oneHour) {
+            console.log('✨ Sessão restaurada para:', session.email);
+            document.getElementById('logged-user-email').textContent = session.email;
+            showDashboard();
+        } else {
+            console.log('⏰ Sessão expirada.');
+            localStorage.removeItem('ksbold_admin_session');
+        }
+    } catch (e) {
+        console.error('Erro ao verificar sessão:', e);
+    }
+}
+
+/**
+ * Encerra a sessão do administrador
+ */
+function handleLogout() {
+    if (confirm('Deseja realmente sair do painel administrativo?')) {
+        localStorage.removeItem('ksbold_admin_session');
+        location.reload();
+    }
 }
 
 /**
@@ -241,20 +327,41 @@ async function loadDashboardData() {
     console.log('📊 Dashboard carregado e Chat CRM Active.');
 }
 
-async function loadStats() {
+async function loadStats(filter = 'all') {
     const ordersEl = document.getElementById('stat-orders');
     const revenueEl = document.getElementById('stat-revenue');
     const usersEl = document.getElementById('stat-users');
 
-    ordersEl.textContent = '0';
-    revenueEl.textContent = 'MT 0,00';
-    usersEl.textContent = '—';
+    ordersEl.textContent = '...';
+    revenueEl.textContent = '...';
 
     const { data: ordersData, error } = await safeSupabaseCall('carregar pedidos (stats)', async (sb) => {
-        return await sb.from('orders').select('id, preco');
+        let query = sb.from('orders').select('id, preco, created_at');
+        
+        if (filter !== 'all') {
+            const now = new Date();
+            let startDate = new Date();
+            
+            if (filter === 'today') {
+                startDate.setHours(0, 0, 0, 0);
+            } else if (filter === 'week') {
+                startDate.setDate(now.getDate() - 7);
+                startDate.setHours(0, 0, 0, 0);
+            } else if (filter === 'month') {
+                startDate.setMonth(now.getMonth() - 1);
+                startDate.setHours(0, 0, 0, 0);
+            }
+            
+            const isoDate = startDate.toISOString();
+            console.log(`🔍 Filtrando desde: ${isoDate} (Filtro: ${filter})`);
+            query = query.gte('created_at', isoDate);
+        }
+        
+        return await query;
     });
 
     if (!error && ordersData) {
+        console.log(`✅ ${ordersData.length} pedidos encontrados para o filtro: ${filter}`);
         // Contar quadros totais
         const totalFrames = ordersData.length;
 
@@ -267,18 +374,13 @@ async function loadStats() {
         ordersEl.textContent = `${uniqueSales} (${totalFrames} quadros)`;
         const total = ordersData.reduce((sum, o) => sum + Number(o.preco || 0), 0);
         revenueEl.textContent = 'MT ' + total.toLocaleString('pt-MZ', { minimumFractionDigits: 2 });
+    } else if (error) {
+        ordersEl.textContent = 'Erro';
+        revenueEl.textContent = 'Erro';
     }
 
-    // Carregar contagem de visitas (Active Users)
-    const { count: visitsCount, error: visitsError } = await safeSupabaseCall('carregar visitas', async (sb) => {
-        return await sb.from('visits').select('*', { count: 'exact', head: true });
-    });
-
-    if (!visitsError) {
-        usersEl.textContent = (visitsCount || 0).toString();
-    } else {
-        usersEl.textContent = '0';
-    }
+    // A contagem de pessoas online agora é gerida em tempo real pelo Realtime Presence
+    // (ver listener no topo do arquivo). Não sobrescrevemos aqui com o histórico.
 }
 
 
@@ -458,7 +560,7 @@ async function loadAllOrders() {
 
 function renderOrders(tbody, orders) {
     if (!orders || orders.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:24px;">Nenhum pedido encontrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:24px;">Nenhum pedido encontrado.</td></tr>';
         return;
     }
 
@@ -486,15 +588,18 @@ function renderOrders(tbody, orders) {
         }
 
         tr.innerHTML = `
+      <td onclick="event.stopPropagation()">
+        <input type="checkbox" class="order-checkbox" data-id="${order.id}" onchange="updateSelectedCount()">
+      </td>
       <td>
         <span class="order-id">#${order.id}</span>
         ${groupId ? `<br><small style="color:#999;font-size:10px;">Grupo: ${groupId}</small>` : ''}
       </td>
-      <td>MT ${Number(order.preco || 0).toFixed(2)}</td>
       <td>
         <span class="status-badge ${statusClass}">${order.tamanho}</span>
         <div style="font-size:11px; margin-top:4px; color:#666;">${qtdInfo}</div>
       </td>
+      <td>MT ${Number(order.preco || 0).toFixed(2)}</td>
       <td>${date}</td>
       <td>
         <select class="status-select" onclick="event.stopPropagation()" onchange="updateOrderStatus('${order.id}', this.value)">
@@ -503,16 +608,62 @@ function renderOrders(tbody, orders) {
           <option value="Cancelado" ${displayStatus === 'Cancelado' ? 'selected' : ''}>Cancelado</option>
         </select>
       </td>
-      <td>
-        <div class="action-buttons" onclick="event.stopPropagation()">
-          <button class="action-btn view" title="Ver imagem" onclick="viewOrderImage('${order.imagem_url || ''}')">👁</button>
-          <button class="action-btn download" title="Download" onclick="downloadImage('${order.imagem_url || ''}', 'pedido_${order.id}')">⬇</button>
+      <td onclick="event.stopPropagation()" style="display: flex; gap: 4px; border-bottom: none;">
+          <button class="action-btn" title="Ver Detalhes" onclick="openOrderDetail('${order.id}')">👁️</button>
+          <button class="action-btn" title="Fatura PDF" onclick="generateOrderPDF('${order.id}')">📄</button>
           <button class="action-btn delete" title="Eliminar pedido" onclick="deleteOrder('${order.id}')">🗑️</button>
-        </div>
       </td>
     `;
         tbody.appendChild(tr);
     });
+
+    // Resetar master checkbox
+    const master = document.getElementById('select-all-orders');
+    if (master) master.checked = false;
+    updateSelectedCount();
+}
+
+function toggleSelectAll(master) {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    checkboxes.forEach(cb => cb.checked = master.checked);
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('.order-checkbox:checked');
+    const count = checkboxes.length;
+    const bar = document.getElementById('bulk-actions');
+    const countEl = document.getElementById('selected-count');
+
+    if (count > 0) {
+        if (bar) bar.style.display = 'flex';
+        if (countEl) countEl.textContent = count;
+    } else {
+        if (bar) bar.style.display = 'none';
+    }
+}
+
+async function deleteSelectedOrders() {
+    const checkboxes = document.querySelectorAll('.order-checkbox:checked');
+    const ids = Array.from(checkboxes).map(cb => cb.getAttribute('data-id'));
+
+    if (ids.length === 0) return;
+
+    if (!await showKSConfirm(`Tem certeza que deseja eliminar ${ids.length} pedido(s) selecionado(s)?\n\nEsta ação é permanente.`)) return;
+
+    const { error } = await safeSupabaseCall('eliminar múltiplos pedidos', async (sb) => {
+        return await sb.from('orders').delete().in('id', ids);
+    });
+
+    if (error) {
+        showKSAlert('❌ Erro ao eliminar: ' + error.message);
+    } else {
+        showKSAlert(`✅ ${ids.length} pedido(s) eliminado(s) com sucesso!`);
+        // Recarregar todas as visualizações
+        loadRecentOrders();
+        loadAllOrders();
+        loadStats(document.getElementById('stats-filter')?.value || 'all');
+    }
 }
 
 async function updateOrderStatus(orderId, newStatus) {
@@ -562,7 +713,28 @@ async function deleteOrder(orderId) {
         showKSAlert('✅ Pedido eliminado com sucesso!');
         // Recarregar tudo
         loadRecentOrders();
-        loadStats();
+        loadAllOrders();
+        loadStats(document.getElementById('stats-filter')?.value || 'all');
+    }
+}
+
+async function resetSystemData() {
+    const confirm1 = await showKSConfirm('⚠️ ATENÇÃO: Você está prestes a apagar TODOS os pedidos e mensagens do sistema.\n\nEsta ação é irreversível e deve ser feita apenas ANTES do lançamento oficial para limpar dados de teste.\n\nDeseja continuar?');
+    if (!confirm1) return;
+
+    const confirm2 = await showKSConfirm('🚨 ÚLTIMO AVISO: Tem certeza ABSOLUTA? Todos os pedidos e conversas de teste serão eliminados permanentemente.');
+    if (!confirm2) return;
+
+    const { error } = await safeSupabaseCall('reset completo do sistema', async (sb) => {
+        // Deletar todos os pedidos (mensagens seguem via CASCADE)
+        return await sb.from('orders').delete().neq('id', 'void-placeholder');
+    });
+
+    if (error) {
+        showKSAlert('❌ Erro no reset: ' + error.message);
+    } else {
+        showKSAlert('🚀 Sistema resetado com sucesso! Agora você pode começar com dados reais.');
+        location.reload();
     }
 }
 
@@ -774,6 +946,7 @@ function initSearch() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    checkSession(); // Verificar se já está logado
     initSearch();
 });
 
@@ -1577,9 +1750,22 @@ async function showWhatsAppQR() {
     btn.disabled = true;
 
     try {
-        const apiUrl = 'https://ksbold-evolution-api.onrender.com';
-        const apiKey = 'ksbold-secreta-1234';
-        const instance = 'ksbold-loja';
+        // Buscar credenciais do banco de dados (não expor no frontend!)
+        const { data: settings } = await safeSupabaseCall('buscar config evolution', async (sb) => {
+            return await sb.from('bot_settings').select('key, value').in('key', ['evolution_api_url', 'evolution_api_key', 'evolution_instance']);
+        });
+
+        const getVal = (key, fallback) => settings?.find(s => s.key === key)?.value || fallback;
+        const apiUrl = getVal('evolution_api_url', '');
+        const apiKey = getVal('evolution_api_key', '');
+        const instance = getVal('evolution_instance', 'ksbold-loja');
+
+        if (!apiUrl || !apiKey) {
+            showKSAlert('⚠️ Configure a URL e a API Key da Evolution API nas configurações do Supabase (tabela bot_settings).\n\nChaves: evolution_api_url, evolution_api_key');
+            btn.textContent = 'Gerar QR Code de Conexão WhatsApp';
+            btn.disabled = false;
+            return;
+        }
 
         // Verificar status de conexão
         const statusRes = await fetch(`${apiUrl}/instance/connectionState/${instance}`, {

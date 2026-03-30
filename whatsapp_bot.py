@@ -10,11 +10,15 @@ if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 from supabase import create_client, Client
 
-# --- CONFIGURAÇÕES KSBOLD ---
-# Substitua pelos dados do seu config.js ou .env
-SUPABASE_URL = "https://zqsxmzbshsozggcwvxla.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpxc3htemJzaHNvemdnY3d2eGxhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NzMwODUsImV4cCI6MjA4NzU0OTA4NX0.Neo-VHUaq7Zwk211QLdg-GEMKgyrouJfl7QepTJZCvk"
-WHATSAPP_API_URL = "https://ksbold-evolution-api.onrender.com/message/sendText/ksbold-loja" # O teu URL do Render
+# --- CONFIGURAÇÕES KSBOLD (Variáveis de Ambiente) ---
+# No Render/Vercel, configure estas chaves nas 'Environment Variables'
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://zqsxmzbshsozggcwvxla.supabase.co")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "") # NUNCA deixe a chave de serviço/admin no código!
+WHATSAPP_API_URL = os.getenv("WHATSAPP_API_URL", "https://ksbold-evolution-api.onrender.com/message/sendText/ksbold-loja")
+EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY", "ksbold-secreta-1234")
+
+if not SUPABASE_KEY:
+    print("⚠️ ERRO: SUPABASE_KEY não encontrada nas variáveis de ambiente!")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -30,11 +34,14 @@ def enviar_whatsapp(numero, mensagem):
         "options": {"delay": 1200, "presence": "composing"},
         "textMessage": {"text": mensagem}
     }
-    headers = {'Content-Type': 'application/json', 'apikey': 'ksbold-secreta-1234'}
+    headers = {'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY}
     
     try:
-        requests.post(WHATSAPP_API_URL, data=json.dumps(payload), headers=headers)
-        print("✅ Mensagem enviada com sucesso!")
+        response = requests.post(WHATSAPP_API_URL, data=json.dumps(payload), headers=headers)
+        if response.status_code in [200, 201]:
+            print("✅ Mensagem enviada com sucesso!")
+        else:
+            print(f"⚠️ Resposta da API: {response.status_code} - {response.text}")
     except Exception as e:
         print(f"❌ Erro ao enviar: {e}")
 

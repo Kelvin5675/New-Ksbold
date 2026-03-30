@@ -1757,3 +1757,72 @@ body {
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     }
 }
+
+/* --- Custom Select Style (KSBOLD Premium) --- */
+.dashboard-header-row {
+    animation: fadeInAdmin 0.5s ease-out;
+}
+
+.filter-wrapper {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    padding: 2px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--border-light);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+    transition: all 0.3s ease;
+}
+
+.filter-wrapper:hover {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+    border-color: var(--green-primary);
+}
+
+.ks-select-wrapper {
+    position: relative;
+    display: inline-block;
+    min-width: 140px;
+}
+
+.ks-select-wrapper select {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background: transparent;
+    border: none;
+    padding: 8px 30px 8px 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dark);
+    cursor: pointer;
+    width: 100%;
+    outline: none;
+    font-family: var(--font-body);
+}
+
+.ks-select-arrow {
+    position: absolute;
+    right: 8px;
+    top: 52%;
+    transform: translateY(-50%);
+    font-size: 8px;
+    color: var(--green-primary);
+    pointer-events: none;
+    transition: transform 0.3s ease;
+}
+
+.ks-select-wrapper:hover .ks-select-arrow {
+    transform: translateY(-50%) scale(1.15);
+}
+
+.ks-select-wrapper select option {
+    background: #fff;
+    color: var(--text-dark);
+    padding: 10px;
+}
+
+@keyframes fadeInAdmin {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}

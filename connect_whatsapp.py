@@ -3,9 +3,9 @@ import base64
 import os
 import time
 
-API_URL = "https://ksbold-evolution-api.onrender.com"
-API_KEY = "ksbold-secreta-1234"
-INSTANCE_NAME = "ksbold-loja"
+API_URL = os.getenv("EVOLUTION_API_URL", "https://ksbold-evolution-api.onrender.com")
+API_KEY = os.getenv("EVOLUTION_API_KEY", "ksbold-secreta-1234")
+INSTANCE_NAME = os.getenv("EVOLUTION_INSTANCE", "ksbold-loja")
 
 def run():
     print("⏳ A preparar a ligacao ao servidor (O Render demora uns minutos a acordar na primeira vez...)")
