@@ -7,7 +7,10 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 if sys.stdout.encoding != 'utf-8':
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding='utf-8', line_buffering=True)
+else:
+    sys.stdout.reconfigure(line_buffering=True)
+
 from supabase import create_client, Client
 
 # --- CONFIGURAÇÕES KSBOLD (Variáveis de Ambiente) ---
@@ -147,9 +150,13 @@ def monitorar_pedidos():
                         grupos[prefix].append(item)
                 
                 for prefix, itens in grupos.items():
+                    print(f"\n🔄 Iniciando processamento do pedido: {prefix} (Itens: {len(itens)})")
                     processar_grupo(prefix, itens)
+                    # Atraso crítico para evitar Rate-Limit/Anti-Spam da API do WhatsApp
+                    print("⏳ Aguardando 3 segundos antes do próximo cliente...")
+                    time.sleep(3)
             
-            time.sleep(10)
+            time.sleep(8)
         except Exception as e:
             print(f"⚠️ Erro no monitor: {e}")
             time.sleep(20)

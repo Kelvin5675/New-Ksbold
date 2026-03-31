@@ -572,6 +572,8 @@ async function finalizarPedidoComAutomacao(e) {
     let totalGeral = 0;
 
     if (supabaseClient) {
+        let ordersToInsert = [];
+
         for (let i = 0; i < itensParaProcessar.length; i++) {
             const item = itensParaProcessar[i];
             const orderId = `${orderGroupId}-${i + 1}`;
@@ -591,24 +593,36 @@ async function finalizarPedidoComAutomacao(e) {
                     imageUrl = urlData.publicUrl;
                 }
 
-                // 2. Criar pedido com dados do cliente
-                const { error: orderError } = await supabaseClient
-                    .from('orders')
-                    .insert([{
-                        id: orderId,
-                        tamanho: item.tamanho,
-                        preco: item.preco,
-                        imagem_url: imageUrl,
-                        status: 'Pendente',
-                        client_name: name,
-                        client_phone: whatsapp
-                    }]);
+                // 2. Acumular dados do cliente para a insercao unica
+                ordersToInsert.push({
+                    id: orderId,
+                    tamanho: item.tamanho,
+                    preco: item.preco,
+                    imagem_url: imageUrl,
+                    status: 'Pendente',
+                    client_name: name,
+                    client_phone: whatsapp
+                    // notificado = false eh o DEFAULT do banco de dados
+                });
 
-                if (orderError) throw orderError;
                 totalGeral += item.preco;
 
             } catch (e) {
-                console.error(e);
+                console.error("Erro no upload da imagem:", e);
+                // Continua para tentar as proximas imagens em vez de falhar tudo
+            }
+        }
+
+        // 3. Inserir todos os pedidos juntos em Lote (BULK INSERT) para que o Bot leia todos ao mesmo tempo!
+        if (ordersToInsert.length > 0) {
+            try {
+                const { error: orderError } = await supabaseClient
+                    .from('orders')
+                    .insert(ordersToInsert);
+
+                if (orderError) throw orderError;
+            } catch (e) {
+                console.error("Erro no bulk insert das ordens:", e);
                 hideLoading();
                 showKSAlert('Erro ao processar pedido. Tente novamente.');
                 return;
