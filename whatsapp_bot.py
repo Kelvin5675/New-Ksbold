@@ -4,7 +4,7 @@ import json
 import requests
 import sys
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer, HTTPServer
 
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8', line_buffering=True)
@@ -161,6 +161,12 @@ def monitorar_pedidos():
             print(f"⚠️ Erro no monitor: {e}")
             time.sleep(20)
 
+import socketserver
+
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
+    """Handle requests in a separate thread."""
+    daemon_threads = True
+
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_HEAD(self):
         self.send_response(200)
@@ -174,14 +180,18 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"Bot is alive!")
 
 def run_health_check_server():
-    port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
-    print(f"✅ Servidor de Health-Check rodando na porta {port}")
-    server.serve_forever()
+    try:
+        port = int(os.environ.get("PORT", 8080))
+        server = ThreadedHTTPServer(('0.0.0.0', port), HealthCheckHandler)
+        print(f"✅ Servidor de Health-Check multicor rodando na porta {port}", flush=True)
+        server.serve_forever()
+    except Exception as e:
+        print(f"❌ Falha FATAL ao abrir a porta do Health-Check: {e}", flush=True)
 
 if __name__ == "__main__":
-    # Inicia o servidor de saúde em uma thread separada para o Render não dar erro
-    threading.Thread(target=run_health_check_server, daemon=True).start()
+    # Inicia o servidor de saude em uma thread separada para o Render nao dar erro
+    t = threading.Thread(target=run_health_check_server, daemon=True)
+    t.start()
     
     # Inicia o monitor de pedidos na thread principal
     monitorar_pedidos()

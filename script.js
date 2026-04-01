@@ -191,11 +191,36 @@ function renderCarousel(images) {
     track.innerHTML = '';
     dotsContainer.innerHTML = '';
 
+    let firstImageLoaded = false;
+
     images.forEach((img, idx) => {
-        // Slide
+        // Slide com Skeleton
         const item = document.createElement('div');
-        item.className = 'carousel-item';
-        item.innerHTML = `<img src="${img.url}" alt="Galeria KSBOLD ${idx + 1}" loading="lazy">`;
+        item.className = 'carousel-item skeleton-bg';
+        
+        // Estrategia de Prioridade (Primeira imagem eh eager e high priority)
+        const loadingAttr = idx === 0 ? '' : 'loading="lazy"';
+        const priorityAttr = idx === 0 ? 'fetchpriority="high"' : '';
+        
+        const imgElement = document.createElement('img');
+        imgElement.src = img.url;
+        imgElement.alt = `Galeria KSBOLD ${idx + 1}`;
+        if (idx !== 0) imgElement.setAttribute('loading', 'lazy');
+        if (idx === 0) imgElement.setAttribute('fetchpriority', 'high');
+        
+        // Listener de OnLoad
+        imgElement.onload = () => {
+            imgElement.classList.add('loaded');
+            item.classList.remove('skeleton-bg');
+            
+            // So inicializar o timer quando a foto 1 baixar
+            if (idx === 0 && !firstImageLoaded) {
+                firstImageLoaded = true;
+                startCarouselTimer(images.length);
+            }
+        };
+
+        item.appendChild(imgElement);
         track.appendChild(item);
 
         // Dot
@@ -203,13 +228,10 @@ function renderCarousel(images) {
         dot.className = `dot ${idx === 0 ? 'active' : ''}`;
         dot.addEventListener('click', () => {
             goToSlide(idx, images.length);
-            resetCarouselTimer(images.length);
+            if (firstImageLoaded) resetCarouselTimer(images.length);
         });
         dotsContainer.appendChild(dot);
     });
-
-    // Iniciar temporizador
-    startCarouselTimer(images.length);
 }
 
 function goToSlide(idx, total) {

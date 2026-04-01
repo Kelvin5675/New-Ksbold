@@ -226,22 +226,40 @@ body {
   position: relative;
 }
 
-.carousel-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 20px;
-}
-
 .carousel-placeholder {
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--card-bg);
-  color: var(--text-muted);
-  font-size: 14px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.02) 25%, rgba(212,184,150,0.07) 50%, rgba(255,255,255,0.02) 75%);
+  background-size: 200% 100%;
+  animation: ks-shimmer 1.5s infinite;
+  color: transparent;
+}
+
+.carousel-item.skeleton-bg {
+  background: linear-gradient(90deg, rgba(255,255,255,0.02) 25%, rgba(212,184,150,0.07) 50%, rgba(255,255,255,0.02) 75%);
+  background-size: 200% 100%;
+  animation: ks-shimmer 1.5s infinite;
+}
+
+@keyframes ks-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.carousel-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 20px;
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.carousel-item img.loaded {
+  opacity: 1;
 }
 
 .carousel-dots {
