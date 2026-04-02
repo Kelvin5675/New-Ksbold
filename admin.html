@@ -395,12 +395,15 @@
                         </div>
                     </div>
 
-                    <!-- Pixel Config -->
+                    <!-- Pixel Config + CAPI -->
                     <div class="mgmt-card">
-                        <h4>Meta Pixel</h4>
-                        <p class="mgmt-desc">Configure o Meta Pixel para rastreamento de conversões.</p>
+                        <h4>Meta Pixel & Conversions API</h4>
+                        <p class="mgmt-desc">Configure o Meta Pixel e o Token CAPI para rastreamento completo de conversões (Frontend + Server-Side).</p>
                         <label class="form-label-admin">PIXEL ID</label>
                         <input type="text" class="admin-input" id="config-pixel-id" placeholder="Insira o Pixel ID">
+                        <label class="form-label-admin" style="margin-top:12px;">TOKEN DE CONVERSÃO (CAPI)</label>
+                        <small style="color:#666; display:block; margin-bottom:6px;">Este token envia eventos de compra direto ao Facebook pelo servidor, contornando bloqueadores de anúncios.</small>
+                        <input type="password" class="admin-input" id="config-capi-token" placeholder="Cole aqui o Token CAPI da Moz Ads">
                         <label class="toggle-label">
                             <label class="toggle-switch">
                                 <input type="checkbox" id="config-pixel-toggle">
@@ -409,6 +412,23 @@
                             Pixel Ativo
                         </label>
                         <button class="btn-admin-primary" onclick="savePixelFromConfig()">Salvar</button>
+                    </div>
+
+                    <!-- Notificações do CEO -->
+                    <div class="mgmt-card">
+                        <h4>🔔 Alertas de Vendas (WhatsApp)</h4>
+                        <p class="mgmt-desc">Receba alertas instantâneos no seu WhatsApp pessoal sempre que uma nova venda for registrada.</p>
+                        <label class="form-label-admin">SEU NÚMERO DE WHATSAPP</label>
+                        <small style="color:#666; display:block; margin-bottom:6px;">Formato: 258XXXXXXXXX (com código do país, sem +)</small>
+                        <input type="tel" class="admin-input" id="config-ceo-whatsapp" placeholder="Ex: 258841234567">
+                        <label class="toggle-label">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="config-ceo-alerts-toggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            Alertas Ativos
+                        </label>
+                        <button class="btn-admin-primary" onclick="saveCeoAlertConfig()">Salvar</button>
                     </div>
 
                     <!-- Preços Config -->

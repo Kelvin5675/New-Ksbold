@@ -414,18 +414,56 @@ async function savePixelSettings() {
 
 async function savePixelFromConfig() {
     const pixelId = document.getElementById('config-pixel-id').value.trim();
+    const capiToken = document.getElementById('config-capi-token').value.trim();
     const pixelAtivo = document.getElementById('config-pixel-toggle').checked;
 
+    // Salvar Pixel ID e toggle na tabela settings
     const { error } = await safeSupabaseCall('salvar pixel (config)', async (sb) => {
         return await sb.from('settings').upsert({ id: 1, meta_pixel_id: pixelId, pixel_ativo: pixelAtivo });
     });
 
+    // Salvar Token CAPI na tabela bot_settings (cofre seguro)
+    if (capiToken) {
+        await safeSupabaseCall('salvar capi token', async (sb) => {
+            return await sb.from('bot_settings').upsert({ key: 'meta_capi_token', value: capiToken }, { onConflict: 'key' });
+        });
+    }
+    // Salvar Pixel ID tambem no bot_settings para o Python ler
+    if (pixelId) {
+        await safeSupabaseCall('salvar pixel id bot', async (sb) => {
+            return await sb.from('bot_settings').upsert({ key: 'meta_pixel_id', value: pixelId }, { onConflict: 'key' });
+        });
+    }
+
     if (!error) {
         document.getElementById('pixel-id-input').value = pixelId;
         document.getElementById('pixel-toggle').checked = pixelAtivo;
-        showKSAlert('✅ Configurações de Pixel e Sistema salvas com sucesso!');
+        showKSAlert('✅ Pixel ID + Token CAPI salvos com sucesso!\n\nO bot vai enviar eventos de compra diretamente ao Facebook.');
     } else {
         showKSAlert('❌ Erro ao salvar: ' + error.message);
+    }
+}
+
+async function saveCeoAlertConfig() {
+    const ceoPhone = document.getElementById('config-ceo-whatsapp').value.trim();
+    const alertsAtivo = document.getElementById('config-ceo-alerts-toggle').checked;
+
+    if (!ceoPhone) {
+        showKSAlert('⚠️ Insira o seu número de WhatsApp para receber alertas.');
+        return;
+    }
+
+    const { error: e1 } = await safeSupabaseCall('salvar ceo whatsapp', async (sb) => {
+        return await sb.from('bot_settings').upsert({ key: 'ceo_whatsapp', value: ceoPhone }, { onConflict: 'key' });
+    });
+    const { error: e2 } = await safeSupabaseCall('salvar ceo alerts toggle', async (sb) => {
+        return await sb.from('bot_settings').upsert({ key: 'ceo_alerts_ativo', value: alertsAtivo ? 'true' : 'false' }, { onConflict: 'key' });
+    });
+
+    if (!e1 && !e2) {
+        showKSAlert('✅ Alertas de vendas configurados!\n\nVocê receberá uma mensagem no WhatsApp sempre que uma nova venda entrar.');
+    } else {
+        showKSAlert('❌ Erro ao salvar: ' + ((e1 || e2)?.message || 'Erro desconhecido'));
     }
 }
 
@@ -457,6 +495,21 @@ async function loadConfigData() {
     if (pixelData) {
         document.getElementById('config-pixel-id').value = pixelData.meta_pixel_id || '';
         document.getElementById('config-pixel-toggle').checked = pixelData.pixel_ativo || false;
+    }
+
+    // Carregar Token CAPI e Alertas do CEO da tabela bot_settings
+    const { data: botSettings } = await safeSupabaseCall('carregar capi+ceo config', async (sb) => {
+        return await sb.from('bot_settings').select('key, value').in('key', ['meta_capi_token', 'ceo_whatsapp', 'ceo_alerts_ativo']);
+    });
+
+    if (botSettings) {
+        const getVal = (key) => botSettings.find(s => s.key === key)?.value || '';
+        const capiInput = document.getElementById('config-capi-token');
+        const ceoInput = document.getElementById('config-ceo-whatsapp');
+        const ceoToggle = document.getElementById('config-ceo-alerts-toggle');
+        if (capiInput) capiInput.value = getVal('meta_capi_token');
+        if (ceoInput) ceoInput.value = getVal('ceo_whatsapp');
+        if (ceoToggle) ceoToggle.checked = getVal('ceo_alerts_ativo') === 'true';
     }
 
     // Carregar preços

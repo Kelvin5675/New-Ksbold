@@ -126,6 +126,90 @@ def processar_grupo(prefix, itens):
         msg += "Por favor, envie o comprovativo aqui para iniciarmos a produção."
 
     enviar_whatsapp(numero_formatado, msg)
+    
+    # 4. Enviar evento de compra ao Facebook (CAPI - Server-Side)
+    enviar_evento_capi(numero_formatado, total, prefix)
+    
+    # 5. Alertar o CEO sobre a nova venda
+    alertar_ceo(nome, prefix, total, len(itens_travados))
+
+def enviar_evento_capi(telefone_cliente, valor_total, order_id):
+    """
+    Envia um evento 'Purchase' ao Facebook via Conversions API (Server-Side).
+    Isso contorna bloqueadores de anúncios e restrições do iOS.
+    """
+    try:
+        # Buscar credenciais do Supabase (cofre seguro)
+        result = supabase.table("bot_settings").select("key, value").in_("key", ["meta_capi_token", "meta_pixel_id"]).execute()
+        if not result.data:
+            print("⚠️ CAPI: Sem token ou Pixel ID configurados. Ignorando evento.")
+            return
+        
+        settings = {item['key']: item['value'] for item in result.data}
+        capi_token = settings.get('meta_capi_token', '')
+        pixel_id = settings.get('meta_pixel_id', '')
+        
+        if not capi_token or not pixel_id:
+            print("⚠️ CAPI: Token ou Pixel ID vazios. Configure no Admin > Configurações.")
+            return
+        
+        import hashlib
+        # Hash do telefone (exigencia do Facebook para privacidade)
+        phone_hash = hashlib.sha256(telefone_cliente.encode()).hexdigest()
+        
+        evento = {
+            "data": [{
+                "event_name": "Purchase",
+                "event_time": int(time.time()),
+                "action_source": "website",
+                "user_data": {
+                    "ph": [phone_hash]
+                },
+                "custom_data": {
+                    "currency": "MZN",
+                    "value": valor_total,
+                    "order_id": order_id
+                }
+            }]
+        }
+        
+        url = f"https://graph.facebook.com/v19.0/{pixel_id}/events?access_token={capi_token}"
+        resp = requests.post(url, json=evento)
+        
+        if resp.status_code == 200:
+            print(f"📊 CAPI: Evento 'Purchase' enviado ao Facebook! (Valor: MT {valor_total:.2f})")
+        else:
+            print(f"⚠️ CAPI: Resposta do Facebook: {resp.status_code} - {resp.text}")
+    except Exception as e:
+        print(f"⚠️ CAPI: Erro (nao-critico): {e}")
+
+def alertar_ceo(nome_cliente, order_id, valor_total, qtd_itens):
+    """
+    Envia uma notificação de nova venda ao WhatsApp pessoal do CEO.
+    """
+    try:
+        result = supabase.table("bot_settings").select("key, value").in_("key", ["ceo_whatsapp", "ceo_alerts_ativo"]).execute()
+        if not result.data:
+            return
+        
+        settings = {item['key']: item['value'] for item in result.data}
+        ceo_phone = settings.get('ceo_whatsapp', '')
+        alerts_ativo = settings.get('ceo_alerts_ativo', 'false')
+        
+        if not ceo_phone or alerts_ativo != 'true':
+            return
+        
+        alerta = f"🚨 *NOVA VENDA KSBOLD!* 🚨\n\n"
+        alerta += f"👤 *Cliente:* {nome_cliente}\n"
+        alerta += f"📦 *Pedido:* #{order_id}\n"
+        alerta += f"🖼️ *Quadros:* {qtd_itens} item(ns)\n"
+        alerta += f"💰 *Valor Total:* MT {valor_total:.2f}\n\n"
+        alerta += f"📱 Abra o Painel Admin para ver os detalhes!"
+        
+        enviar_whatsapp(ceo_phone, alerta)
+        print(f"🔔 Alerta de venda enviado ao CEO!")
+    except Exception as e:
+        print(f"⚠️ Alerta CEO: Erro (nao-critico): {e}")
 
 def monitorar_pedidos():
     """
