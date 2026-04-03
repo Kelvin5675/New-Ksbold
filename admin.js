@@ -267,7 +267,8 @@ function switchSection(sectionId, navEl) {
         geral: 'Visão Geral',
         vendas: 'Vendas',
         galeria: 'Galeria',
-        config: 'Configurações'
+        config: 'Configurações',
+        telemetria: 'Funil ao Vivo'
     };
     document.getElementById('page-title').textContent = titles[sectionId] || 'Visão Geral';
 
@@ -276,8 +277,9 @@ function switchSection(sectionId, navEl) {
     if (sectionId === 'vendas') loadAllOrders();
     if (sectionId === 'config') { loadConfigData(); loadWhatsAppConfig(); }
     if (sectionId === 'galeria') loadGallery();
+    if (sectionId === 'telemetria') { initFunnelPresence(); loadDesistenciaData('hoje'); }
 
-    if (event) event.preventDefault();
+    if (window.event) window.event.preventDefault();
 }
 
 function toggleSidebar() {
@@ -2018,4 +2020,162 @@ async function generateOrderPDF(orderId) {
         console.error('Erro PDF:', err);
         showKSAlert('❌ Erro ao gerar PDF: ' + err.message);
     }
+}
+// ======== TELEMETRIA: FUNIL AO VIVO & ANALYTICS ========
+
+let funnelChannel = null;
+
+/**
+ * Inicializa o monitoramento em tempo real do funil
+ */
+function initFunnelPresence() {
+    if (!supabaseClient) return;
+    if (funnelChannel) return; // Já inicializado
+
+    funnelChannel = supabaseClient.channel('ksbold-funnel');
+    
+    funnelChannel
+        .on('presence', { event: 'sync' }, () => {
+            renderLiveFunnel(funnelChannel.presenceState());
+        })
+        .subscribe();
+}
+
+/**
+ * Renderiza as barras e contadores do funil ao vivo
+ */
+function renderLiveFunnel(state) {
+    const totalOnlineEl = document.getElementById('telemetria-total-online');
+    const listEl = document.getElementById('telemetria-sessoes-lista');
+    
+    const counts = [0, 0, 0, 0]; // [Step 0, 1, 2, 3]
+    const activeSessions = [];
+
+    Object.values(state).forEach(presences => {
+        presences.forEach(p => {
+            if (p.step !== undefined) {
+                counts[p.step]++;
+                activeSessions.push(p);
+            }
+        });
+    });
+
+    const total = activeSessions.length;
+    if (totalOnlineEl) totalOnlineEl.textContent = `${total} Online Agora`;
+
+    // Atualizar Barras de Progresso
+    counts.forEach((count, i) => {
+        const bar = document.getElementById(`funnel-bar-${i}`);
+        const countTxt = document.getElementById(`funnel-count-${i}`);
+        
+        if (bar) {
+            // Lógica de largura: % relativa ao total de online
+            const pct = total > 0 ? (count / total) * 100 : 0;
+            bar.style.width = pct + '%';
+            if (count > 0) bar.classList.add('funnel-glow');
+            else bar.classList.remove('funnel-glow');
+        }
+        if (countTxt) countTxt.textContent = count;
+    });
+
+    // Atualizar Lista de Sessões
+    if (listEl) {
+        if (activeSessions.length === 0) {
+            listEl.innerHTML = '<p style="color:#999; text-align:center; padding:15px;">Aguardando visitantes...</p>';
+            return;
+        }
+
+        const stepNames = ['Início', 'Tamanhos', 'Upload', 'Checkout'];
+        listEl.innerHTML = activeSessions.map(s => `
+            <div class="sessao-item etapa-${s.step}">
+                <div class="sessao-dot"></div>
+                <strong style="width: 80px;">Sessão #${s.id.slice(-4)}</strong>
+                <span>Etapa: <b>${stepNames[s.step]}</b></span>
+                <small style="margin-left: auto; opacity: 0.6;">v.${s.v || '1.0'}</small>
+            </div>
+        `).join('');
+    }
+}
+
+/**
+ * Carrega dados históricos de desistência
+ */
+async function loadDesistenciaData(periodo) {
+    // UI Feedback
+    document.querySelectorAll('.btn-periodo').forEach(b => b.classList.remove('active'));
+    const activeBtn = document.querySelector(`[data-periodo="${periodo}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    if (!supabaseClient) return;
+
+    try {
+        let query = supabaseClient.from('telemetria_eventos').select('*');
+        
+        const agora = new Date();
+        if (periodo === 'hoje') {
+            agora.setHours(0, 0, 0, 0);
+            query = query.gte('created_at', agora.toISOString());
+        } else if (periodo === 'semana') {
+            const semana = new Date();
+            semana.setDate(semana.getDate() - 7);
+            query = query.gte('created_at', semana.toISOString());
+        } else if (periodo === 'mes') {
+            const mes = new Date();
+            mes.setMonth(mes.getMonth() - 1);
+            query = query.gte('created_at', mes.toISOString());
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        processAndRenderChart(data);
+    } catch (e) {
+        console.error('Erro ao carregar telemetria:', e);
+    }
+}
+
+/**
+ * Processa os logs e calcula as taxas de desistência
+ */
+function processAndRenderChart(logs) {
+    const totalByStep = [0, 0, 0, 0];
+    
+    // Contar quantas pessoas ÚNICAS passaram por cada etapa
+    const sessionsByStep = [new Set(), new Set(), new Set(), new Set()];
+    
+    logs.forEach(log => {
+        if (log.etapa_index !== undefined) {
+            sessionsByStep[log.etapa_index].add(log.sessao_id);
+        }
+    });
+
+    const uniqueCounts = sessionsByStep.map(s => s.size);
+    const max = Math.max(...uniqueCounts, 1);
+
+    uniqueCounts.forEach((count, i) => {
+        const bar = document.getElementById(`desist-bar-${i}`);
+        const pctTxt = document.getElementById(`desist-pct-${i}`);
+        const numTxt = document.getElementById(`desist-num-${i}`);
+
+        if (bar) {
+            const height = (count / max) * 100;
+            bar.style.height = height + '%';
+        }
+
+        // Taxa de Desistência: Pessoas que entraram nesta mas NÃO na próxima
+        let desistencia = 0;
+        if (i < 3) {
+            const entrouNesta = uniqueCounts[i];
+            const entrouProxima = uniqueCounts[i+1];
+            if (entrouNesta > 0) {
+                desistencia = Math.max(0, ((entrouNesta - entrouProxima) / entrouNesta) * 100);
+            }
+        } else {
+            // Na última etapa, desistência é quem chegou mas não comprou (difícil medir sem webhook de pago)
+            desistencia = 0; 
+        }
+
+        if (pctTxt) pctTxt.textContent = i < 3 ? desistencia.toFixed(0) + '%' : '-';
+        if (numTxt) numTxt.textContent = count + ' sessões';
+    });
 }

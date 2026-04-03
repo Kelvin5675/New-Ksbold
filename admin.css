@@ -1826,3 +1826,165 @@ body {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* ======== TELEMETRIA: FUNIL AO VIVO ======== */
+
+.funnel-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.funnel-bar-label {
+    min-width: 140px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.funnel-bar-track {
+    flex: 1;
+    height: 28px;
+    background: #f0f2f5;
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+}
+
+.funnel-bar-fill {
+    height: 100%;
+    border-radius: 14px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.funnel-bar-step0 { background: linear-gradient(90deg, #00c853, #69f0ae); }
+.funnel-bar-step1 { background: linear-gradient(90deg, #2979ff, #82b1ff); }
+.funnel-bar-step2 { background: linear-gradient(90deg, #aa00ff, #ea80fc); }
+.funnel-bar-step3 { background: linear-gradient(90deg, #d4b896, #f5e6d0); }
+
+.funnel-bar-fill.funnel-glow {
+    box-shadow: 0 0 12px rgba(0, 200, 83, 0.4);
+    animation: funnelPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes funnelPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
+}
+
+.funnel-bar-count {
+    min-width: 36px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--green-primary);
+    background: var(--green-light);
+    padding: 4px 10px;
+    border-radius: 10px;
+}
+
+/* Sessões Ativas */
+.sessao-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #fafafa;
+    border-radius: 8px;
+    border-left: 3px solid #ccc;
+    font-size: 13px;
+    animation: fadeInAdmin 0.3s ease;
+}
+
+.sessao-item.etapa-0 { border-left-color: #00c853; }
+.sessao-item.etapa-1 { border-left-color: #2979ff; }
+.sessao-item.etapa-2 { border-left-color: #aa00ff; }
+.sessao-item.etapa-3 { border-left-color: #d4b896; }
+
+.sessao-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #00c853;
+    animation: funnelPulse 1.5s ease-in-out infinite;
+}
+
+/* Gráfico de Desistência */
+.desistencia-chart {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+    height: 220px;
+    margin-top: 20px;
+    padding: 10px 0;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.desistencia-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+}
+
+.desistencia-bar-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 160px;
+    width: 100%;
+}
+
+.desistencia-bar {
+    width: 45px;
+    border-radius: 8px 8px 0 0;
+    transition: height 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    min-height: 4px;
+}
+
+.desistencia-bar-step0 { background: linear-gradient(180deg, #00c853, #69f0ae); }
+.desistencia-bar-step1 { background: linear-gradient(180deg, #2979ff, #82b1ff); }
+.desistencia-bar-step2 { background: linear-gradient(180deg, #aa00ff, #ea80fc); }
+.desistencia-bar-step3 { background: linear-gradient(180deg, #d4b896, #f5e6d0); }
+
+.desistencia-pct {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+}
+
+.desistencia-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-gray);
+    margin-top: 6px;
+}
+
+.desistencia-num {
+    font-size: 11px;
+    color: #999;
+}
+
+/* Botões de Período */
+.btn-periodo {
+    padding: 4px 12px !important;
+    font-size: 11px !important;
+    border-radius: 6px !important;
+    cursor: pointer;
+}
+
+.btn-periodo.active {
+    background: var(--green-primary) !important;
+    color: #fff !important;
+    border-color: var(--green-primary) !important;
+}
+
+@media (max-width: 768px) {
+    .funnel-bar-label { min-width: 100px; font-size: 11px; }
+    .desistencia-bar { width: 30px; }
+    .desistencia-chart { height: 180px; }
+}

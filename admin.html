@@ -135,6 +135,12 @@
                     </svg>
                     Configurações
                 </a>
+                <a href="#" class="nav-item" data-section="telemetria" onclick="switchSection('telemetria', this)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg>
+                    Funil ao Vivo
+                </a>
             </nav>
 
             <!-- Info do usuário logado -->
@@ -455,6 +461,108 @@
 
                 </div>
             </div><!-- /section-config -->
+
+            <!-- ========== SEÇÃO: FUNIL AO VIVO (TELEMETRIA) ========== -->
+            <div class="section-content" id="section-telemetria" style="display:none;">
+                
+                <!-- Card: Sessões Ao Vivo -->
+                <div class="mgmt-card" style="grid-column: 1 / -1;">
+                    <div class="mgmt-header">
+                        <h4>📡 Funil de Vendas — Tempo Real</h4>
+                        <span id="telemetria-total-online" style="background: linear-gradient(135deg, #00c853, #00e676); color: #fff; padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 14px;">0 Online</span>
+                    </div>
+                    <p class="mgmt-desc">Veja exatamente onde cada visitante está no funil de compra neste momento.</p>
+
+                    <!-- Barras de Progresso por Etapa -->
+                    <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 20px;">
+                        <div class="funnel-bar-row">
+                            <div class="funnel-bar-label">🏠 Página Inicial</div>
+                            <div class="funnel-bar-track">
+                                <div class="funnel-bar-fill funnel-bar-step0" id="funnel-bar-0" style="width: 0%"></div>
+                            </div>
+                            <span class="funnel-bar-count" id="funnel-count-0">0</span>
+                        </div>
+                        <div class="funnel-bar-row">
+                            <div class="funnel-bar-label">📐 Tamanhos</div>
+                            <div class="funnel-bar-track">
+                                <div class="funnel-bar-fill funnel-bar-step1" id="funnel-bar-1" style="width: 0%"></div>
+                            </div>
+                            <span class="funnel-bar-count" id="funnel-count-1">0</span>
+                        </div>
+                        <div class="funnel-bar-row">
+                            <div class="funnel-bar-label">📷 Upload Fotos</div>
+                            <div class="funnel-bar-track">
+                                <div class="funnel-bar-fill funnel-bar-step2" id="funnel-bar-2" style="width: 0%"></div>
+                            </div>
+                            <span class="funnel-bar-count" id="funnel-count-2">0</span>
+                        </div>
+                        <div class="funnel-bar-row">
+                            <div class="funnel-bar-label">💳 Checkout Final</div>
+                            <div class="funnel-bar-track">
+                                <div class="funnel-bar-fill funnel-bar-step3" id="funnel-bar-3" style="width: 0%"></div>
+                            </div>
+                            <span class="funnel-bar-count" id="funnel-count-3">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Sessões Ativas -->
+                    <div style="margin-top: 20px;">
+                        <h4 style="margin-bottom:10px; font-size:14px; color:#888;">Sessões Ativas</h4>
+                        <div id="telemetria-sessoes-lista" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto;">
+                            <p style="color:#999; text-align:center; padding:15px;">Aguardando visitantes...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: Gráfico de Desistência -->
+                <div class="mgmt-card" style="grid-column: 1 / -1;">
+                    <div class="mgmt-header">
+                        <h4>📊 Taxa de Desistência por Etapa</h4>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn-admin-outline btn-periodo active" data-periodo="hoje" onclick="loadDesistenciaData('hoje')">Hoje</button>
+                            <button class="btn-admin-outline btn-periodo" data-periodo="semana" onclick="loadDesistenciaData('semana')">Semana</button>
+                            <button class="btn-admin-outline btn-periodo" data-periodo="mes" onclick="loadDesistenciaData('mes')">Mês</button>
+                        </div>
+                    </div>
+                    <p class="mgmt-desc">Percentagem de visitantes que saíram em cada etapa sem avançar.</p>
+
+                    <!-- Gráfico CSS -->
+                    <div class="desistencia-chart" id="desistencia-chart">
+                        <div class="desistencia-col">
+                            <div class="desistencia-bar-wrapper">
+                                <span class="desistencia-pct" id="desist-pct-0">0%</span>
+                                <div class="desistencia-bar desistencia-bar-step0" id="desist-bar-0" style="height: 0%"></div>
+                            </div>
+                            <span class="desistencia-label">Início</span>
+                            <span class="desistencia-num" id="desist-num-0">0</span>
+                        </div>
+                        <div class="desistencia-col">
+                            <div class="desistencia-bar-wrapper">
+                                <span class="desistencia-pct" id="desist-pct-1">0%</span>
+                                <div class="desistencia-bar desistencia-bar-step1" id="desist-bar-1" style="height: 0%"></div>
+                            </div>
+                            <span class="desistencia-label">Tamanhos</span>
+                            <span class="desistencia-num" id="desist-num-1">0</span>
+                        </div>
+                        <div class="desistencia-col">
+                            <div class="desistencia-bar-wrapper">
+                                <span class="desistencia-pct" id="desist-pct-2">0%</span>
+                                <div class="desistencia-bar desistencia-bar-step2" id="desist-bar-2" style="height: 0%"></div>
+                            </div>
+                            <span class="desistencia-label">Upload</span>
+                            <span class="desistencia-num" id="desist-num-2">0</span>
+                        </div>
+                        <div class="desistencia-col">
+                            <div class="desistencia-bar-wrapper">
+                                <span class="desistencia-pct" id="desist-pct-3">0%</span>
+                                <div class="desistencia-bar desistencia-bar-step3" id="desist-bar-3" style="height: 0%"></div>
+                            </div>
+                            <span class="desistencia-label">Checkout</span>
+                            <span class="desistencia-num" id="desist-num-3">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div><!-- /section-telemetria -->
 
             <!-- Footer -->
             <footer class="admin-footer">
