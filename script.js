@@ -975,3 +975,8 @@ async function trackStep(stepIndex) {
         console.warn('Erro silencioso na telemetria:', e);
     }
 }
+
+// Disparar rastreio da etapa inicial (Home) automaticamente no carregamento
+setTimeout(() => {
+    trackStep(0);
+}, 1000);
