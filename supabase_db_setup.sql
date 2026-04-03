@@ -79,3 +79,24 @@ INSERT INTO public.bot_settings (key, value) VALUES
   ('evolution_api_key', 'ksbold-secreta-1234'),
   ('evolution_instance', 'ksbold-loja')
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
+
+-- ======== FASE 2: TELEMETRIA & FUNIL EM TEMPO REAL ========
+
+-- 6. Tabela de Telemetria (Rastreio de Etapas do Cliente)
+CREATE TABLE IF NOT EXISTS public.telemetria_eventos (
+    id BIGSERIAL PRIMARY KEY,
+    sessao_id TEXT NOT NULL,
+    etapa_nome TEXT NOT NULL,
+    etapa_index INTEGER NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.telemetria_eventos ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anon pode inserir telemetria" ON public.telemetria_eventos;
+CREATE POLICY "Anon pode inserir telemetria" ON public.telemetria_eventos FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Auth pode ler telemetria" ON public.telemetria_eventos;
+CREATE POLICY "Auth pode ler telemetria" ON public.telemetria_eventos FOR SELECT USING (true);
+
+CREATE INDEX IF NOT EXISTS idx_telemetria_created ON public.telemetria_eventos (created_at);

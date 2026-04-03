@@ -117,6 +117,9 @@ function goToStep(stepIndex) {
 
     // Disparar eventos do Meta Pixel
     firePixelEvent(stepIndex);
+    
+    // Rastreio de Funil KSBOLD (Realtime + Analytics)
+    if (typeof trackStep === 'function') trackStep(stepIndex);
 }
 
 /**
@@ -923,3 +926,52 @@ async function trackVisit() {
         console.warn('Presença online não iniciada:', e);
     }
 })();
+
+// ======== TELEMETRIA KSBOLD — FUNIL EM TEMPO REAL ========
+let funnelChannel = null;
+const SESSAO_ID = (function() {
+    let id = sessionStorage.getItem('ksbold_sid');
+    if (!id) {
+        id = 'ks_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        sessionStorage.setItem('ksbold_sid', id);
+    }
+    return id;
+})();
+
+/**
+ * Rastreia a mudança de etapa no funil
+ */
+async function trackStep(stepIndex) {
+    if (!supabaseClient) return;
+
+    const stepNames = ['inicio', 'tamanhos', 'upload', 'checkout'];
+    const etapaNome = stepNames[stepIndex] || 'unknown';
+
+    try {
+        // 1. Atualizar Presence (para o Admin ver ao vivo)
+        if (!funnelChannel) {
+            funnelChannel = supabaseClient.channel('ksbold-funnel');
+            await funnelChannel.subscribe();
+        }
+        
+        funnelChannel.track({
+            id: SESSAO_ID,
+            step: stepIndex,
+            v: '1.2'
+        });
+
+        // 2. Gravar no Banco (para Gráficos de Desistência)
+        // Usamos transação silenciosa para não pesar no navegador
+        supabaseClient.from('telemetria_eventos').insert([{
+            sessao_id: SESSAO_ID,
+            etapa_nome: etapaNome,
+            etapa_index: stepIndex
+        }]).then(({ error }) => {
+            if (error) console.warn('Telemetria DB Error:', error.message);
+        });
+
+    } catch (e) {
+        // Falha no rastreio nunca deve travar o site do cliente
+        console.warn('Erro silencioso na telemetria:', e);
+    }
+}
