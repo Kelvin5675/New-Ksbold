@@ -276,54 +276,55 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+        self.send_header('Access-Control-Max-Age', '86400')
         self.end_headers()
 
     def do_POST(self):
+        # Sempre enviar cabeçalhos CORS básicos
+        def send_cors_headers(response_code=200):
+            self.send_response(response_code)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+            self.end_headers()
+
         if self.path == '/ai/chat':
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            data = json.loads(post_data)
-            user_msg = data.get('message', '')
-
-            print(f"💬 Recebida mensagem para Diretoria IA: {user_msg}")
-
-            # Lógica do "Diretor IA" usando Gemini
             try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+                user_msg = data.get('message', '')
+
+                print(f"💬 [API] Recebida mensagem para Diretoria IA: {user_msg}")
+
+                # Lógica do "Diretor IA" usando Gemini
                 if not GEMINI_API_KEY:
                     reply = "⚠️ Erro: GEMINI_API_KEY não configurada no Render."
                 else:
                     model = genai.GenerativeModel('gemini-1.5-pro')
-                    
                     system_prompt = """
                     Você é o DIRETOR IA GEMINI da empresa KSBOLD (Moçambique).
-                    Sua personalidade: Analítico, estratégico, protetor da marca, focado em alta conversão e luxo acessível.
-                    Seu papel: Coordenar agentes de marketing, vendas e telemetria.
-                    Contexto: O sistema da KSBOLD está no ar, vendendo quadros decorativos premium. 
-                    Regra Realismo: Seus textos devem ser humanos, sem clichês robóticos. 
-                    Use 'Meticais' (MT) como moeda.
-                    Responda sempre com autoridade de um diretor que conhece todos os dados da empresa.
+                    Personalidade: Analítico, estratégico, protetor da marca, focado em luxo acessível.
+                    Papel: Coordenar agentes de marketing, vendas e telemetria.
+                    Contexto: O sistema está no ar, vendendo quadros premium. 
+                    Regra: Respostas humanas, autoritárias e úteis. Use MT (Meticais).
                     """
-                    
                     chat = model.start_chat(history=[])
                     response = chat.send_message(f"{system_prompt}\n\nMensagem do CEO Kelvin: {user_msg}")
                     reply = response.text
 
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-                self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-                self.end_headers()
+                send_cors_headers(200)
                 self.wfile.write(json.dumps({"reply": reply}).encode('utf-8'))
 
             except Exception as e:
-                print(f"❌ Erro no Gemini: {e}")
-                self.send_response(500)
-                self.send_header('Content-type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
+                print(f"❌ [API] Erro no processamento: {e}")
+                send_cors_headers(500)
                 self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
+        else:
+            send_cors_headers(404)
+            self.wfile.write(json.dumps({"error": "Path not found"}).encode('utf-8'))
 
 
 def run_health_check_server():

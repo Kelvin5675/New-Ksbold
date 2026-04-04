@@ -280,6 +280,7 @@ function switchSection(sectionId, navEl) {
     if (sectionId === 'galeria') loadGallery();
     if (sectionId === 'telemetria') { initFunnelPresence(); loadDesistenciaData('hoje'); }
     if (sectionId === 'brain-ia') {
+        checkBrainStatus(); // Verificar se a IA está acordada
         setTimeout(() => document.getElementById('brain-input')?.focus(), 300);
     }
 
@@ -2262,4 +2263,31 @@ function addChatMessage(role, text) {
 
     container.appendChild(msg);
     container.scrollTop = container.scrollHeight;
+}
+async function checkBrainStatus() {
+    const dot = document.getElementById('ai-status-dot');
+    if (!dot) return;
+    
+    try {
+        const botUrl = "https://ksbold-cerebro-python.onrender.com/";
+        const response = await fetch(botUrl, { 
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache'
+        });
+        
+        if (response.ok) {
+            dot.style.background = 'rgba(0,200,83,0.2)';
+            dot.style.color = '#69f0ae';
+            dot.innerHTML = '<span class="sessao-dot" style="background:#69f0ae"></span> Online';
+            console.log("🧠 Diretoria IA: Conexão estabelecida.");
+        } else {
+            throw new Error("Server response not OK");
+        }
+    } catch (e) {
+        console.warn("⚠️ Diretoria IA: Servidor Offline ou Pendente.");
+        dot.style.background = 'rgba(255,82,82,0.2)';
+        dot.style.color = '#ff5252';
+        dot.innerHTML = '<span class="sessao-dot" style="background:#ff5252"></span> Offline';
+    }
 }
