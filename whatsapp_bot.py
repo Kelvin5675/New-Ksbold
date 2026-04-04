@@ -336,30 +336,50 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
                     try:
                         # 1. Pegar dados REAIS da KSBOLD
                         snapshot = get_ksbold_snapshot()
+                        history_data = data.get('history', [])
                         
                         # 2. Configurar Modelo
                         model_name = 'gemini-2.0-flash'
                         model = genai.GenerativeModel(model_name)
                         
                         system_prompt = f"""
-                        Você é o DIRETOR IA GEMINI da empresa KSBOLD (Moçambique).
-                        Personalidade: Analítico, estratégico, autoritário mas leal ao CEO Kelvin.
-                        
-                        ESTADO ATUAL DA EMPRESA:
+                        [DIRETRIZES DE COMANDO - DIRETORIA IA KSBOLD]
+                        Você é o Cérebro Estratégico por trás da KSBOLD, a marca líder em decoração, venda de quadros em tela foam board premium/básico em Moçambique.
+                        Seu interlocutor é o CEO Kelvin. Fale com ele como um sócio de confiança: visão estratégica, foco em ROI e lealdade absoluta.
+
+                        CONHECIMENTO PROFUNDO DA KSBOLD:
+                        - Nicho: Quadros Decorativos Personalizados de Alta Qualidade.
+                        - Diferencial: Impressão de luxo, molduras exclusivas e entrega rápida.
+                        - Localização: Operação em Moçambique (Preços em Meticais - MT).
+                        - Fluxo: O cliente escolhe/uploada uma foto no site -> Escolhe o tamanho -> Paga -> Recebe notificação automatizada via WhatsApp.
+
+                        SUA MISSÃO COMO DIRETOR:
+                        1. Analisar os dados do [SNAPSHOT] abaixo e sugerir melhorias.
+                        2. Coordenar a Equipe de Agentes (Fase 6): designer, copywriter e social media.
+                        3. Criar ideias de conteúdo viral para Reels/TikTok focado no nosso negócio.
+
+                        [SNAPSHOT REAL-TIME DA EMPRESA]:
                         {snapshot}
-                        
-                        MULT-AGENTES (Seus subordinados - Fase de Preparação):
-                        - Agente Designer: Cria artes de luxo.
-                        - Agente Copywriter: Escreve legendas virais.
-                        - Agente Social: Cuida das postagens automáticas.
-                        
-                        Seu papel: Analisar os dados acima e responder ao CEO. Você sabe tudo o que acontece no sistema.
-                        Regra: Use MT (Meticais). Respostas curtas, impactantes e focadas em lucro.
+
+                        REGRAS DE OURO:
+                        - Use um tom Profissional, Elegante, Moçambicano e focado em Resultados.
+                        - Você tem memória da conversa atual (Histórico abaixo). Use isso para manter o raciocínio.
                         """
                         
-                        contents = [
-                            {"role": "user", "parts": [f"{system_prompt}\n\nMensagem do CEO Kelvin: {user_msg}"]}
-                        ]
+                        # Preparar corpo da conversa com contexto e histórico
+                        contents = []
+                        # Injetar sistema como primeira mensagem de contexto
+                        contents.append({"role": "user", "parts": [system_prompt]})
+                        contents.append({"role": "model", "parts": ["Entendido, CEO Kelvin. Estou pronto para gerir a KSBOLD com excelência. Como posso ajudar agora?"]})
+                        
+                        # Adicionar histórico recebido
+                        for msg in history_data:
+                            role = "user" if msg.get('role') == 'user' else "model"
+                            contents.append({"role": role, "parts": [msg.get('text', '')]})
+                        
+                        # Garantir que a mensagem atual está no fim do histórico se não estiver duplicada
+                        if not history_data or history_data[-1].get('text') != user_msg:
+                            contents.append({"role": "user", "parts": [user_msg]})
                         
                         response = model.generate_content(contents)
                         reply = response.text

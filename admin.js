@@ -2217,13 +2217,16 @@ async function sendMessageToBrain() {
     try {
         // 3. Chamada ao backend (Bot Python no Render)
         // Nota: URL sincronizada com o serviço ksbold-cerebro-python no Render
+        // 3. Chamada ao backend com HISTÓRICO para contexto real
         const botUrl = "https://ksbold-cerebro-python.onrender.com/ai/chat"; 
+        const history = JSON.parse(localStorage.getItem('ksbold_ai_chat') || '[]').slice(-10); // Últimas 10 msgs
         
         const response = await fetch(botUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 message: text,
+                history: history, // Enviando o contexto
                 context: {
                     user: "CEO Kelvin",
                     platform: "Admin Panel"
