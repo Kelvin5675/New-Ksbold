@@ -2209,8 +2209,8 @@ async function sendMessageToBrain() {
 
     try {
         // 3. Chamada ao backend (Bot Python no Render)
-        // Nota: Substituiremos a URL pela URL real do bot no Render
-        const botUrl = "https://ksbold-whatsapp-bot.onrender.com/ai/chat"; 
+        // Nota: URL sincronizada com o serviço ksbold-cerebro-python no Render
+        const botUrl = "https://ksbold-cerebro-python.onrender.com/ai/chat"; 
         
         const response = await fetch(botUrl, {
             method: 'POST',
