@@ -268,7 +268,8 @@ function switchSection(sectionId, navEl) {
         vendas: 'Vendas',
         galeria: 'Galeria',
         config: 'Configurações',
-        telemetria: 'Funil ao Vivo'
+        telemetria: 'Funil ao Vivo',
+        'brain-ia': 'Diretoria IA'
     };
     document.getElementById('page-title').textContent = titles[sectionId] || 'Visão Geral';
 
@@ -278,6 +279,9 @@ function switchSection(sectionId, navEl) {
     if (sectionId === 'config') { loadConfigData(); loadWhatsAppConfig(); }
     if (sectionId === 'galeria') loadGallery();
     if (sectionId === 'telemetria') { initFunnelPresence(); loadDesistenciaData('hoje'); }
+    if (sectionId === 'brain-ia') {
+        setTimeout(() => document.getElementById('brain-input')?.focus(), 300);
+    }
 
     if (window.event) window.event.preventDefault();
 }
@@ -2178,4 +2182,84 @@ function processAndRenderChart(logs) {
         if (pctTxt) pctTxt.textContent = i < 3 ? desistencia.toFixed(0) + '%' : '-';
         if (numTxt) numTxt.textContent = count + ' sessões';
     });
+}
+
+// ======== DIRETORIA IA (BRAIN) LOGIC ========
+
+async function sendMessageToBrain() {
+    const input = document.getElementById('brain-input');
+    const container = document.getElementById('brain-chat-container');
+    const text = input.value.trim();
+
+    if (!text) return;
+
+    // 1. Adicionar mensagem do usuário
+    addChatMessage('user', text);
+    input.value = '';
+
+    // 2. Mostrar estado de "Pensando..."
+    const thinkingId = 'thinking-' + Date.now();
+    const thinkingMsg = document.createElement('div');
+    thinkingMsg.id = thinkingId;
+    thinkingMsg.className = 'ai-msg';
+    thinkingMsg.style = "align-self: flex-start; max-width: 85%; background: white; padding: 18px; border-radius: 0 20px 20px 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 5px solid #94a3b8; opacity: 0.7;";
+    thinkingMsg.innerHTML = `<p style="margin:0; font-size: 14px; font-style: italic; color: #64748b;">O Diretor IA está analisando os dados da KSBOLD...</p>`;
+    container.appendChild(thinkingMsg);
+    container.scrollTop = container.scrollHeight;
+
+    try {
+        // 3. Chamada ao backend (Bot Python no Render)
+        // Nota: Substituiremos a URL pela URL real do bot no Render
+        const botUrl = "https://ksbold-whatsapp-bot.onrender.com/ai/chat"; 
+        
+        const response = await fetch(botUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                message: text,
+                context: {
+                    user: "CEO Kelvin",
+                    platform: "Admin Panel"
+                }
+            })
+        });
+
+        const data = await response.json();
+        
+        // 4. Remover "Pensando..." e adicionar resposta real
+        document.getElementById(thinkingId).remove();
+        addChatMessage('ai', data.reply || "Desculpe, Diretor Kelvin. Tive um erro de conexão com meu cérebro central. Pode repetir?");
+        
+    } catch (error) {
+        console.error('Erro na Diretoria IA:', error);
+        document.getElementById(thinkingId).remove();
+        addChatMessage('ai', "Houve um problema de conexão. Verifique se o Bot no Render está online.");
+    }
+}
+
+function addChatMessage(role, text) {
+    const container = document.getElementById('brain-chat-container');
+    const msg = document.createElement('div');
+    
+    const isAi = role === 'ai';
+    const bgColor = isAi ? 'white' : 'var(--accent-gold)';
+    const textColor = isAi ? 'var(--text-dark)' : 'white';
+    const align = isAi ? 'flex-start' : 'flex-end';
+    const border = isAi ? 'border-left: 5px solid var(--accent-gold)' : 'none';
+    const radius = isAi ? '0 20px 20px 20px' : '20px 0 20px 20px';
+    const shadow = isAi ? '0 4px 15px rgba(0,0,0,0.05)' : '0 4px 15px rgba(212, 184, 150, 0.2)';
+
+    msg.style = `align-self: ${align}; max-width: 85%; background: ${bgColor}; padding: 18px; border-radius: ${radius}; box-shadow: ${shadow}; ${border};`;
+    
+    msg.innerHTML = `
+        <p style="margin:0; font-size: 14.5px; line-height: 1.6; color: ${textColor};">
+            ${text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')}
+        </p>
+        <small style="display: block; margin-top: 10px; opacity: 0.5; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: ${textColor};">
+            ${isAi ? 'Enviado por Diretoria IA' : 'CEO Kelvin'}
+        </small>
+    `;
+
+    container.appendChild(msg);
+    container.scrollTop = container.scrollHeight;
 }
