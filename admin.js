@@ -280,7 +280,8 @@ function switchSection(sectionId, navEl) {
     if (sectionId === 'galeria') loadGallery();
     if (sectionId === 'telemetria') { initFunnelPresence(); loadDesistenciaData('hoje'); }
     if (sectionId === 'brain-ia') {
-        checkBrainStatus(); // Verificar se a IA está acordada
+        checkBrainStatus(); 
+        loadChatHistory(); // Carregar histórico salvo
         setTimeout(() => document.getElementById('brain-input')?.focus(), 300);
     }
 
@@ -2263,7 +2264,50 @@ function addChatMessage(role, text) {
 
     container.appendChild(msg);
     container.scrollTop = container.scrollHeight;
+
+    // Salvar no histórico (localStorage para persistência rápida)
+    saveChatToHistory(role, text);
 }
+
+function saveChatToHistory(role, text) {
+    let history = JSON.parse(localStorage.getItem('ksbold_ai_chat') || '[]');
+    history.push({ role, text, time: new Date().toISOString() });
+    // Manter apenas as últimas 50 mensagens para performance
+    if (history.length > 50) history.shift();
+    localStorage.setItem('ksbold_ai_chat', JSON.stringify(history));
+}
+
+function loadChatHistory() {
+    const container = document.getElementById('brain-chat-container');
+    // Só carregar se o container estiver vazio (evitar duplicados no switch de tab)
+    if (container.children.length > 1) return; 
+
+    const history = JSON.parse(localStorage.getItem('ksbold_ai_chat') || '[]');
+    history.forEach(msg => {
+        // Usamos uma versão simplificada de addChatMessage que não salva novamente
+        const msgElement = document.createElement('div');
+        const isAi = msg.role === 'ai';
+        const bgColor = isAi ? 'white' : 'var(--accent-gold)';
+        const textColor = isAi ? 'var(--text-dark)' : 'white';
+        const align = isAi ? 'flex-start' : 'flex-end';
+        const border = isAi ? 'border-left: 5px solid var(--accent-gold)' : 'none';
+        const radius = isAi ? '0 20px 20px 20px' : '20px 0 20px 20px';
+        const shadow = isAi ? '0 4px 15px rgba(0,0,0,0.05)' : '0 4px 15px rgba(212, 184, 150, 0.2)';
+
+        msgElement.style = `align-self: ${align}; max-width: 85%; background: ${bgColor}; padding: 18px; border-radius: ${radius}; box-shadow: ${shadow}; ${border}; margin-bottom: 10px;`;
+        msgElement.innerHTML = `
+            <p style="margin:0; font-size: 14.5px; line-height: 1.6; color: ${textColor};">
+                ${msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')}
+            </p>
+            <small style="display: block; margin-top: 10px; opacity: 0.5; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: ${textColor};">
+                ${isAi ? 'Diretoria IA' : 'CEO Kelvin'}
+            </small>
+        `;
+        container.appendChild(msgElement);
+    });
+    container.scrollTop = container.scrollHeight;
+}
+
 async function checkBrainStatus() {
     const dot = document.getElementById('ai-status-dot');
     if (!dot) return;

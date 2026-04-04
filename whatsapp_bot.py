@@ -260,6 +260,34 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
     daemon_threads = True
 
+def get_ksbold_snapshot():
+    """Colhe dados reais do banco para alimentar a IA."""
+    try:
+        # 1. Resumo de Pedidos (tabela 'orders')
+        res = supabase.table("orders").select("total_price, status").execute()
+        orders = res.data or []
+        
+        # 2. Resumo de Funil/Métricas (tabela 'metrics_funil')
+        res_funil = supabase.table("metrics_funil").select("*").order("created_at", desc=True).limit(1).execute()
+        funil = res_funil.data[0] if res_funil.data else {}
+
+        # Cálculos de Negócio
+        receita_paga = sum(float(o.get('total_price', 0)) for o in orders if o.get('status') == 'paid')
+        total_pedidos = len(orders)
+        pedidos_pendentes = len([o for o in orders if o.get('status') != 'paid'])
+        
+        snapshot = f"""
+        [RELATÓRIO KSBOLD EM TEMPO REAL]
+        - Pedidos Totais: {total_pedidos} ({pedidos_pendentes} pendentes)
+        - Receita Confirmada: {receita_paga} MT
+        - Performance Funil: {funil.get('home_views', 0)} visitas na home, {funil.get('checkout_views', 0)} no checkout.
+        - Status: Sistema operacional e monitorando vendas.
+        """
+        return snapshot
+    except Exception as e:
+        print(f"⚠️ Erro ao colher snapshot: {e}")
+        return "Dados reais indisponíveis no momento (erro de conexão com banco)."
+
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_HEAD(self):
         self.send_response(200)
@@ -267,8 +295,10 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         self.end_headers()
         
     def do_GET(self):
+        # Adicionar CORS ao GET para o ping de status do Admin funcionar
         self.send_response(200)
         self.send_header('Content-type', 'text/plain')
+        self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         self.wfile.write(b"Bot is alive!")
 
@@ -299,21 +329,44 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
                 print(f"💬 [API] Recebida mensagem para Diretoria IA: {user_msg}")
 
-                # Lógica do "Diretor IA" usando Gemini
+                # Lógica do "Diretor IA" usando Gemini High-Intelligence + Real Data
                 if not GEMINI_API_KEY:
                     reply = "⚠️ Erro: GEMINI_API_KEY não configurada no Render."
                 else:
-                    model = genai.GenerativeModel('gemini-1.5-pro')
-                    system_prompt = """
-                    Você é o DIRETOR IA GEMINI da empresa KSBOLD (Moçambique).
-                    Personalidade: Analítico, estratégico, protetor da marca, focado em luxo acessível.
-                    Papel: Coordenar agentes de marketing, vendas e telemetria.
-                    Contexto: O sistema está no ar, vendendo quadros premium. 
-                    Regra: Respostas humanas, autoritárias e úteis. Use MT (Meticais).
-                    """
-                    chat = model.start_chat(history=[])
-                    response = chat.send_message(f"{system_prompt}\n\nMensagem do CEO Kelvin: {user_msg}")
-                    reply = response.text
+                    try:
+                        # 1. Pegar dados REAIS da KSBOLD
+                        snapshot = get_ksbold_snapshot()
+                        
+                        # 2. Configurar Modelo
+                        model_name = 'gemini-2.0-flash'
+                        model = genai.GenerativeModel(model_name)
+                        
+                        system_prompt = f"""
+                        Você é o DIRETOR IA GEMINI da empresa KSBOLD (Moçambique).
+                        Personalidade: Analítico, estratégico, autoritário mas leal ao CEO Kelvin.
+                        
+                        ESTADO ATUAL DA EMPRESA:
+                        {snapshot}
+                        
+                        MULT-AGENTES (Seus subordinados - Fase de Preparação):
+                        - Agente Designer: Cria artes de luxo.
+                        - Agente Copywriter: Escreve legendas virais.
+                        - Agente Social: Cuida das postagens automáticas.
+                        
+                        Seu papel: Analisar os dados acima e responder ao CEO. Você sabe tudo o que acontece no sistema.
+                        Regra: Use MT (Meticais). Respostas curtas, impactantes e focadas em lucro.
+                        """
+                        
+                        contents = [
+                            {"role": "user", "parts": [f"{system_prompt}\n\nMensagem do CEO Kelvin: {user_msg}"]}
+                        ]
+                        
+                        response = model.generate_content(contents)
+                        reply = response.text
+
+                    except Exception as ge:
+                        print(f"❌ Erro Crítico Gemini ({model_name}): {ge}")
+                        reply = f"❌ Erro ao acessar o cérebro: {str(ge)}"
 
                 send_cors_headers(200)
                 self.wfile.write(json.dumps({"reply": reply}).encode('utf-8'))
