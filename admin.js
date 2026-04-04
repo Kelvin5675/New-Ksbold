@@ -2199,14 +2199,19 @@ async function sendMessageToBrain() {
     addChatMessage('user', text);
     input.value = '';
 
-    // 2. Mostrar estado de "Pensando..."
+    // 2. Mostrar estado de "Pensando..." (Premium Animation)
     const thinkingId = 'thinking-' + Date.now();
-    const thinkingMsg = document.createElement('div');
-    thinkingMsg.id = thinkingId;
-    thinkingMsg.className = 'ai-msg';
-    thinkingMsg.style = "align-self: flex-start; max-width: 85%; background: white; padding: 18px; border-radius: 0 20px 20px 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 5px solid #94a3b8; opacity: 0.7;";
-    thinkingMsg.innerHTML = `<p style="margin:0; font-size: 14px; font-style: italic; color: #64748b;">O Diretor IA está analisando os dados da KSBOLD...</p>`;
-    container.appendChild(thinkingMsg);
+    const thinkingWrapper = document.createElement('div');
+    thinkingWrapper.id = thinkingId;
+    thinkingWrapper.style = "display: flex; gap: 12px; align-items: flex-end; margin-bottom: 20px; animation: fadeInChat 0.3s ease-out;";
+    
+    thinkingWrapper.innerHTML = `
+        <div style="width: 35px; height: 35px; background: var(--bg-dark); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 2px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); flex-shrink: 0;">🧠</div>
+        <div style="background: white; padding: 15px 20px; border-radius: 20px 20px 20px 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.02);">
+            <div class="typing-dots"><span></span><span></span><span></span></div>
+        </div>
+    `;
+    container.appendChild(thinkingWrapper);
     container.scrollTop = container.scrollHeight;
 
     try {
@@ -2241,97 +2246,109 @@ async function sendMessageToBrain() {
 
 function addChatMessage(role, text) {
     const container = document.getElementById('brain-chat-container');
-    const msg = document.createElement('div');
+    if (!container) return;
     
     const isAi = role === 'ai';
-    const bgColor = isAi ? 'white' : 'var(--accent-gold)';
-    const textColor = isAi ? 'var(--text-dark)' : 'white';
-    const align = isAi ? 'flex-start' : 'flex-end';
-    const border = isAi ? 'border-left: 5px solid var(--accent-gold)' : 'none';
-    const radius = isAi ? '0 20px 20px 20px' : '20px 0 20px 20px';
-    const shadow = isAi ? '0 4px 15px rgba(0,0,0,0.05)' : '0 4px 15px rgba(212, 184, 150, 0.2)';
+    const msgWrapper = document.createElement('div');
+    msgWrapper.className = `msg-wrapper ${role}`;
+    msgWrapper.style = `display: flex; gap: 12px; align-items: flex-end; margin-bottom: 20px; animation: fadeInChat 0.4s ease-out; ${isAi ? '' : 'flex-direction: row-reverse;'}`;
 
-    msg.style = `align-self: ${align}; max-width: 85%; background: ${bgColor}; padding: 18px; border-radius: ${radius}; box-shadow: ${shadow}; ${border};`;
-    
-    msg.innerHTML = `
-        <p style="margin:0; font-size: 14.5px; line-height: 1.6; color: ${textColor};">
+    const avatar = document.createElement('div');
+    avatar.style = `width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: ${isAi ? 'var(--bg-dark)' : 'linear-gradient(135deg, var(--accent-gold), #d4af37)'}; border: 2px solid white;`;
+    avatar.innerHTML = isAi ? '🧠' : '👤';
+
+    const bubble = document.createElement('div');
+    const bubbleBg = isAi ? 'white' : 'linear-gradient(135deg, #2d3748, #1a202c)';
+    const textColor = isAi ? '#4a5568' : 'white';
+    const radius = isAi ? '20px 20px 20px 5px' : '20px 20px 5px 20px';
+    const shadow = isAi ? '0 5px 15px rgba(0,0,0,0.03)' : '0 10px 25px rgba(0,0,0,0.1)';
+    const border = isAi ? '1px solid rgba(0,0,0,0.02)' : 'none';
+
+    bubble.style = `background: ${bubbleBg}; color: ${textColor}; padding: 18px 22px; border-radius: ${radius}; box-shadow: ${shadow}; max-width: 80%; border: ${border};`;
+    bubble.innerHTML = `
+        <p style="margin: 0; line-height: 1.6; font-size: 14.5px;">
             ${text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')}
         </p>
-        <small style="display: block; margin-top: 10px; opacity: 0.5; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: ${textColor};">
-            ${isAi ? 'Enviado por Diretoria IA' : 'CEO Kelvin'}
-        </small>
     `;
 
-    container.appendChild(msg);
+    msgWrapper.appendChild(avatar);
+    msgWrapper.appendChild(bubble);
+    container.appendChild(msgWrapper);
     container.scrollTop = container.scrollHeight;
 
-    // Salvar no histórico (localStorage para persistência rápida)
-    saveChatToHistory(role, text);
+    // Salvar no histórico
+    if (typeof saveChatToHistory === 'function') saveChatToHistory(role, text);
 }
 
 function saveChatToHistory(role, text) {
     let history = JSON.parse(localStorage.getItem('ksbold_ai_chat') || '[]');
     history.push({ role, text, time: new Date().toISOString() });
-    // Manter apenas as últimas 50 mensagens para performance
     if (history.length > 50) history.shift();
     localStorage.setItem('ksbold_ai_chat', JSON.stringify(history));
 }
 
 function loadChatHistory() {
     const container = document.getElementById('brain-chat-container');
-    // Só carregar se o container estiver vazio (evitar duplicados no switch de tab)
-    if (container.children.length > 1) return; 
+    if (!container) return;
+    if (container.children.length > 0) return; 
 
+    // Mensagem de boas-vindas padrão se não houver histórico
     const history = JSON.parse(localStorage.getItem('ksbold_ai_chat') || '[]');
-    history.forEach(msg => {
-        // Usamos uma versão simplificada de addChatMessage que não salva novamente
-        const msgElement = document.createElement('div');
-        const isAi = msg.role === 'ai';
-        const bgColor = isAi ? 'white' : 'var(--accent-gold)';
-        const textColor = isAi ? 'var(--text-dark)' : 'white';
-        const align = isAi ? 'flex-start' : 'flex-end';
-        const border = isAi ? 'border-left: 5px solid var(--accent-gold)' : 'none';
-        const radius = isAi ? '0 20px 20px 20px' : '20px 0 20px 20px';
-        const shadow = isAi ? '0 4px 15px rgba(0,0,0,0.05)' : '0 4px 15px rgba(212, 184, 150, 0.2)';
+    
+    if (history.length === 0) {
+        addChatMessage('ai', 'Bom dia, **CEO Kelvin**. Sou o seu Diretor IA. Estou a monitorar a **KSBOLD** em tempo real e pronto para decisões estratégicas.\n\nComo posso ajudar na estratégia hoje?');
+        return;
+    }
 
-        msgElement.style = `align-self: ${align}; max-width: 85%; background: ${bgColor}; padding: 18px; border-radius: ${radius}; box-shadow: ${shadow}; ${border}; margin-bottom: 10px;`;
-        msgElement.innerHTML = `
-            <p style="margin:0; font-size: 14.5px; line-height: 1.6; color: ${textColor};">
-                ${msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')}
-            </p>
-            <small style="display: block; margin-top: 10px; opacity: 0.5; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: ${textColor};">
-                ${isAi ? 'Diretoria IA' : 'CEO Kelvin'}
-            </small>
-        `;
-        container.appendChild(msgElement);
+    history.forEach(msg => {
+        // Recriar sem salvar no histórico de novo
+        renderMessageItem(msg.role, msg.text);
     });
     container.scrollTop = container.scrollHeight;
 }
 
+function renderMessageItem(role, text) {
+    const container = document.getElementById('brain-chat-container');
+    const isAi = role === 'ai';
+    const msgWrapper = document.createElement('div');
+    msgWrapper.style = `display: flex; gap: 12px; align-items: flex-end; margin-bottom: 20px; ${isAi ? '' : 'flex-direction: row-reverse;'}`;
+
+    const avatar = document.createElement('div');
+    avatar.style = `width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: ${isAi ? 'var(--bg-dark)' : 'linear-gradient(135deg, var(--accent-gold), #d4af37)'}; border: 2px solid white;`;
+    avatar.innerHTML = isAi ? '🧠' : '👤';
+
+    const bubble = document.createElement('div');
+    const bubbleBg = isAi ? 'white' : 'linear-gradient(135deg, #2d3748, #1a202c)';
+    const textColor = isAi ? '#4a5568' : 'white';
+    const radius = isAi ? '20px 20px 20px 5px' : '20px 20px 5px 20px';
+
+    bubble.style = `background: ${bubbleBg}; color: ${textColor}; padding: 18px 22px; border-radius: ${radius}; box-shadow: 0 5px 15px rgba(0,0,0,0.03); max-width: 80%; border: ${isAi ? '1px solid rgba(0,0,0,0.02)' : 'none'};`;
+    bubble.innerHTML = `<p style="margin: 0; line-height: 1.6; font-size: 14.5px;">${text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')}</p>`;
+
+    msgWrapper.appendChild(avatar);
+    msgWrapper.appendChild(bubble);
+    container.appendChild(msgWrapper);
+}
+
 async function checkBrainStatus() {
-    const dot = document.getElementById('ai-status-dot');
-    if (!dot) return;
+    const indicator = document.getElementById('ai-status-indicator');
+    const textIndicator = document.getElementById('ai-status-text');
+    if (!indicator) return;
     
     try {
         const botUrl = "https://ksbold-cerebro-python.onrender.com/";
-        const response = await fetch(botUrl, { 
-            method: 'GET',
-            mode: 'cors',
-            cache: 'no-cache'
-        });
+        const response = await fetch(botUrl, { method: 'GET', mode: 'cors' });
         
         if (response.ok) {
-            dot.style.background = 'rgba(0,200,83,0.2)';
-            dot.style.color = '#69f0ae';
-            dot.innerHTML = '<span class="sessao-dot" style="background:#69f0ae"></span> Online';
-            console.log("🧠 Diretoria IA: Conexão estabelecida.");
+            indicator.style.background = '#69f0ae';
+            textIndicator.textContent = 'Online';
+            textIndicator.style.color = '#4caf50';
         } else {
-            throw new Error("Server response not OK");
+            throw new Error();
         }
     } catch (e) {
-        console.warn("⚠️ Diretoria IA: Servidor Offline ou Pendente.");
-        dot.style.background = 'rgba(255,82,82,0.2)';
-        dot.style.color = '#ff5252';
-        dot.innerHTML = '<span class="sessao-dot" style="background:#ff5252"></span> Offline';
+        indicator.style.background = '#ff5252';
+        textIndicator.textContent = 'Offline';
+        textIndicator.style.color = '#ff5252';
     }
 }
