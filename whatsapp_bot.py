@@ -42,6 +42,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "") # 🚀 NOVO: Fallback para Groq (Ll
 
 # --- CACHE DE RESPOSTAS (ECONOMIA DE COTA 429) ---
 AI_CACHE = {}
+LAST_GENERATED_IMAGE = None  # Guarda a última imagem gerada para exibir no chat
 
 def get_cached_reply(message):
     m = message.strip().lower()
@@ -190,6 +191,34 @@ def tool_executar_campanha(tema):
     except Exception as e:
         return f"⚠️ Erro ao orquestrar: {str(e)}"
 
+def tool_gerar_imagem(prompt, numero_whatsapp=""):
+    """Gera uma imagem de alta qualidade a partir de um prompt de texto usando IA (Pollinations.ai, gratuito).
+    Se numero_whatsapp for fornecido, envia a imagem diretamente para o WhatsApp."""
+    global LAST_GENERATED_IMAGE
+    try:
+        from urllib.parse import quote
+        # Adicionar estilo KSBOLD ao prompt
+        full_prompt = f"{prompt}, luxury brand style, premium quality, dark elegant background, gold accents, KSBOLD Mozambique"
+        url = f"https://image.pollinations.ai/prompt/{quote(full_prompt)}?width=1024&height=1024&nologo=true"
+        
+        # Baixar a imagem gerada
+        img_resp = requests.get(url, timeout=60)
+        if img_resp.status_code == 200:
+            import base64
+            img_b64 = base64.b64encode(img_resp.content).decode('utf-8')
+            LAST_GENERATED_IMAGE = img_b64  # Guardar para exibir no chat
+            
+            # Se tiver número, enviar para WhatsApp
+            if numero_whatsapp:
+                result = tool_enviar_midia_whatsapp(numero_whatsapp, img_b64, "image/png", f"🎨 KSBOLD Design: {prompt}")
+                return f"✅ Imagem gerada e enviada! {result}"
+            
+            return f"✅ Imagem gerada com sucesso! A imagem está pronta para ser visualizada."
+        else:
+            return f"⚠️ Erro ao gerar imagem: HTTP {img_resp.status_code}"
+    except Exception as e:
+        return f"❌ Erro na geração: {str(e)}"
+
 # --- SERVER ---
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
@@ -222,36 +251,31 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
                 snap = get_ksbold_snapshot()
                 mems = get_ai_memories()
+                # Truncar memórias para não ultrapassar limites da Groq
+                if len(mems) > 500: mems = mems[:500] + "..."
                 now_dt = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
                 
-                # --- PERSONA MASTER DA KSBOLD (Upgrade Temporal e Estratégico) ---
-                instruct = f"""VOCE E O DIRETOR ESTRATEGICO DA KSBOLD (MOCAMBIQUE). 
-Seu chefe e o Sr. Kelvin, o visionario CEO da marca.
-MISSAO: Tornar a KSBOLD a maior referencia em Quadros de Luxo e Design.
+                # --- PERSONA COMPACTA (Otimizada para Groq) ---
+                instruct = f"""DIRETOR ESTRATEGICO KSBOLD (Moçambique). Chefe: Sr. Kelvin (CEO).
+MISSAO: Tornar KSBOLD referencia em Quadros de Luxo.
+AGORA: {now_dt}. {snap}
+MEMORIAS: {mems}
+REGRAS: Fale com elegancia/luxo. Foco em ROI. NUNCA diga que e IA. Use tools quando necessario."""
 
---- CONTEXTO ATUAL ---
-DATA/HORA AGORA: {now_dt} (Use isso para posts e saudações).
-SNAPSHOT EMPRESA: {snap}
-MEMORIAS DE LONGO PRAZO:
-{mems}
-
---- CAPACIDADES E REGRAS ---
-1. Sofisticacao: Voce fala com elegancia (Luxo) e foco em ROI.
-2. Identidade: Voce e o braço direito do CEO Kelvin. NUNCA diga que e uma IA.
-3. Aprendizado: Use 'tool_salvar_memoria' para fatos novos.
-4. Comunicacao: Use 'tool_enviar_whatsapp' para relatorios e alertas (incluindo para o Kelvin).
-5. Trafego: Se perguntarem trafego, sugira criar a tabela 'traffic' no Supabase.
-6. Ferramentas: Copywriter, Designer, Memoria, Relogio e WhatsApp."""
-
-                # --- GESTÃO DE HISTÓRICO ---
+                # --- GESTÃO DE HISTÓRICO (Limitado a 6 msgs para não estourar cota) ---
                 messages_openai = [{"role": "system", "content": instruct}]
-                for h in data.get('history', []):
+                history = data.get('history', [])
+                # Manter apenas as últimas 6 mensagens do histórico
+                if len(history) > 6:
+                    history = history[-6:]
+                for h in history:
                     r = "user" if h.get('role') == 'user' else "assistant"
-                    messages_openai.append({"role": r, "content": str(h.get('text', ''))})
+                    msg_text = str(h.get('text', ''))[:500]  # Truncar msgs longas
+                    messages_openai.append({"role": r, "content": msg_text})
                 
                 # Identifica o Kelvin (O Mestre)
                 if len(messages_openai) == 1:
-                    messages_openai.append({"role": "assistant", "content": f"Ola Sr. Kelvin. Como posso elevar o ROI da KSBOLD hoje?"})
+                    messages_openai.append({"role": "assistant", "content": "Ola Sr. Kelvin. Como posso elevar o ROI da KSBOLD hoje?"})
                 
                 messages_openai.append({"role": "user", "content": user_msg})
 
@@ -302,7 +326,7 @@ MEMORIAS DE LONGO PRAZO:
                     if media:
                         groq_models = ["llama-3.2-90b-vision-preview"]
                     else:
-                        groq_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+                        groq_models = ["llama-3.3-70b-versatile"]
 
                     for g_model in groq_models:
                         try:
@@ -317,14 +341,15 @@ MEMORIAS DE LONGO PRAZO:
                                     {"type": "image_url", "image_url": {"url": f"data:{media['mime_type']};base64,{media['data']}"}}
                                 ]
 
-                            data_groq = {"model": g_model, "messages": ms_groq, "temperature": 0.6}
+                            data_groq = {"model": g_model, "messages": ms_groq, "temperature": 0.6, "max_tokens": 1500}
                             
                             # Adicionar payload de ferramentas se não for vision (Llama vision não suporta tool calling)
                             if "vision" not in g_model:
                                 data_groq["tools"] = [
-                                    {"type": "function", "function": {"name": "tool_executar_campanha", "description": "Orquestra uma campanha (Copywriter + Designer) e entrega a pauta completa.", "parameters": {"type": "object", "properties": {"tema": {"type": "string"}}, "required": ["tema"]}}},
-                                    {"type": "function", "function": {"name": "tool_salvar_memoria", "description": "Grave uma informacao para o futuro. (Meta, Regra, etc)", "parameters": {"type": "object", "properties": {"chave": {"type": "string"}, "valor": {"type": "string"}}, "required": ["chave", "valor"]}}},
-                                    {"type": "function", "function": {"name": "tool_enviar_whatsapp", "description": "Usa a Evolution API para enviar uma mensagem real no WhatsApp para qualquer numero. Muito util para enviar os resultados das campanhas ao CEO.", "parameters": {"type": "object", "properties": {"numero": {"type": "string", "description": "Numero em formato +258..."}, "mensagem": {"type": "string", "description": "Conteudo a enviar"}}, "required": ["numero", "mensagem"]}}}
+                                    {"type": "function", "function": {"name": "tool_executar_campanha", "description": "Orquestra uma campanha de marketing completa.", "parameters": {"type": "object", "properties": {"tema": {"type": "string"}}, "required": ["tema"]}}},
+                                    {"type": "function", "function": {"name": "tool_salvar_memoria", "description": "Grave um facto para o futuro.", "parameters": {"type": "object", "properties": {"chave": {"type": "string"}, "valor": {"type": "string"}}, "required": ["chave", "valor"]}}},
+                                    {"type": "function", "function": {"name": "tool_enviar_whatsapp", "description": "Envia msg WhatsApp.", "parameters": {"type": "object", "properties": {"numero": {"type": "string"}, "mensagem": {"type": "string"}}, "required": ["numero", "mensagem"]}}},
+                                    {"type": "function", "function": {"name": "tool_gerar_imagem", "description": "Gera imagem IA (Pollinations) e opcionalmente envia ao WhatsApp.", "parameters": {"type": "object", "properties": {"prompt": {"type": "string", "description": "Descricao visual da imagem em ingles"}, "numero_whatsapp": {"type": "string", "description": "Numero WhatsApp para enviar (opcional)"}}, "required": ["prompt"]}}}
                                 ]
 
                             gr_resp = requests.post("https://api.groq.com/openai/v1/chat/completions", json=data_groq, headers=headers, timeout=20)
@@ -340,6 +365,7 @@ MEMORIAS DE LONGO PRAZO:
                                         if fn == "tool_executar_campanha": res_t = tool_executar_campanha(args.get('tema',''))
                                         elif fn == "tool_salvar_memoria": res_t = tool_salvar_memoria(args.get('chave',''), args.get('valor',''))
                                         elif fn == "tool_enviar_whatsapp": res_t = tool_enviar_whatsapp(args.get('numero',''), args.get('mensagem',''))
+                                        elif fn == "tool_gerar_imagem": res_t = tool_gerar_imagem(args.get('prompt',''), args.get('numero_whatsapp',''))
                                         else: res_t = "Erro ferramenta não encontrada"
                                         
                                         ms_groq.append({"role": "tool", "tool_call_id": t['id'], "name": fn, "content": str(res_t)})
@@ -360,7 +386,14 @@ MEMORIAS DE LONGO PRAZO:
                     final_text = f"⚠️ Diretor Kelvin, infelizmente estou com dificuldade técnica (Gemini e Groq). Último erro: {ultimo_erro[:150]}"
 
                 set_cached_reply(user_msg, final_text)
-                reply({'reply': final_text})
+                
+                # Incluir imagem gerada na resposta se houver
+                response_data = {'reply': final_text}
+                if LAST_GENERATED_IMAGE:
+                    response_data['image_base64'] = LAST_GENERATED_IMAGE
+                    LAST_GENERATED_IMAGE = None  # Limpar após enviar
+                
+                reply(response_data)
             except Exception as e: reply({'error': str(e)}, 500)
             except Exception as e: reply({'error': str(e)}, 500)
 

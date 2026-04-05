@@ -2255,7 +2255,15 @@ async function sendMessageToBrain() {
         
         // 4. Remover "Pensando..." e adicionar resposta real
         document.getElementById(thinkingId).remove();
-        addChatMessage('ai', data.reply || "Desculpe, Diretor Kelvin. Tive um erro de conexão com meu cérebro central. Pode repetir?");
+        
+        let aiReply = data.reply || "Desculpe, Diretor Kelvin. Tive um erro de conexão com meu cérebro central. Pode repetir?";
+        
+        // Se houver imagem gerada, incluir no balão de resposta
+        if (data.image_base64) {
+            aiReply += `\n<div style="margin-top: 12px;"><img src="data:image/png;base64,${data.image_base64}" style="max-width: 100%; max-height: 350px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); cursor: pointer;" onclick="window.open(this.src, '_blank')" title="Clique para ampliar"></div>`;
+        }
+        
+        addChatMessage('ai', aiReply);
         
     } catch (error) {
         console.error('Erro na Diretoria IA:', error);
