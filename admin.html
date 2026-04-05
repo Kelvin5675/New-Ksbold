@@ -596,8 +596,11 @@
                     </div>
 
                     <!-- Chat Input -->
-                    <div class="chat-footer" style="padding: 20px 30px; background: white; border-top: 1px solid rgba(0,0,0,0.05); display: flex; align-items: center; gap: 15px;">
                         <div style="display: flex; gap: 12px; color: #a0aec0; font-size: 20px;">
+                            <input type="file" id="brain-file-input" style="display:none" accept="image/*,application/pdf" onchange="handleBrainFileSelect(event)">
+                            <i class="fas fa-paperclip" style="cursor: pointer;" onclick="document.getElementById('brain-file-input').click()"></i>
+                            <i class="fas fa-image" style="cursor: pointer;" onclick="document.getElementById('brain-file-input').click()"></i>
+                        </div>
                             <span style="cursor: pointer;">😊</span>
                             <span style="cursor: pointer;">📎</span>
                         </div>

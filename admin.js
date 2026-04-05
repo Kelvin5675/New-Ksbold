@@ -2193,10 +2193,14 @@ async function sendMessageToBrain() {
     const container = document.getElementById('brain-chat-container');
     const text = input.value.trim();
 
-    if (!text) return;
+    if (!text && !pendingBrainFile) return;
 
-    // 1. Adicionar mensagem do usuário
-    addChatMessage('user', text);
+    // Se houver anexo mas não houver texto, enviamos um prompt padrão de visão
+    const finalMsg = text || (pendingBrainFile ? "Analise este ficheiro para mim, por favor." : "");
+    if (!finalMsg) return;
+
+    // 1. Adicionar mensagem do usuário (com indicador de anexo se houver)
+    addChatMessage('user', text + (pendingBrainFile ? `\n\n[Anexo: ${pendingBrainFile.name}]` : ''));
     input.value = '';
 
     // 2. Mostrar estado de "Pensando..." (Premium Animation)
@@ -2230,9 +2234,13 @@ async function sendMessageToBrain() {
                 context: {
                     user: "CEO Kelvin",
                     platform: "Admin Panel"
-                }
+                },
+                media: pendingBrainFile // Envia a mídia (Base64) se existir
             })
         });
+
+        // Limpar anexo após envio bem-sucedido
+        clearBrainFile();
 
         const data = await response.json();
         
@@ -2331,6 +2339,61 @@ function renderMessageItem(role, text) {
     msgWrapper.appendChild(avatar);
     msgWrapper.appendChild(bubble);
     container.appendChild(msgWrapper);
+}
+
+// ======== MULTIMODAL LOGIC (IMAGENS E PDFS) ========
+
+let pendingBrainFile = null;
+
+/**
+ * Captura o ficheiro e converte para Base64 para a IA "ver"
+ */
+function handleBrainFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) { // Limite 10MB
+        showKSAlert('Ficheiro muito grande. Limite: 10MB');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        pendingBrainFile = {
+            mime_type: file.type,
+            data: e.target.result.split(',')[1], // Apenas o base64
+            name: file.name
+        };
+        
+        // Feedback visual: mostrar nome do ficheiro em cima do input
+        showBrainFilePreview(file.name);
+    };
+    reader.readAsDataURL(file);
+}
+
+function showBrainFilePreview(name) {
+    const container = document.getElementById('brain-chat-container');
+    let preview = document.getElementById('brain-file-preview');
+    
+    if (!preview) {
+        preview = document.createElement('div');
+        preview.id = 'brain-file-preview';
+        preview.style = "background: #eef2f7; padding: 10px 15px; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #475569; position: sticky; bottom: 0; z-index: 5; border: 1px dashed #cbd5e1;";
+        container.appendChild(preview);
+    }
+    
+    preview.innerHTML = `
+        <i class="fas fa-file"></i>
+        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📎 ${name}</span>
+        <i class="fas fa-times" style="cursor:pointer; color:#ef4444;" onclick="clearBrainFile()"></i>
+    `;
+    container.scrollTop = container.scrollHeight;
+}
+
+function clearBrainFile() {
+    pendingBrainFile = null;
+    document.getElementById('brain-file-input').value = '';
+    document.getElementById('brain-file-preview')?.remove();
 }
 
 async function checkBrainStatus() {
