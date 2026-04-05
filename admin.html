@@ -596,13 +596,12 @@
                     </div>
 
                     <!-- Chat Input -->
+                    <div class="chat-footer" style="padding: 20px 30px; background: white; border-top: 1px solid rgba(0,0,0,0.05); display: flex; align-items: center; gap: 15px; border-radius: 0 0 30px 30px;">
                         <div style="display: flex; gap: 12px; color: #a0aec0; font-size: 20px;">
-                            <input type="file" id="brain-file-input" style="display:none" accept="image/*,application/pdf" onchange="handleBrainFileSelect(event)">
-                            <i class="fas fa-paperclip" style="cursor: pointer;" onclick="document.getElementById('brain-file-input').click()"></i>
-                            <i class="fas fa-image" style="cursor: pointer;" onclick="document.getElementById('brain-file-input').click()"></i>
-                        </div>
                             <span style="cursor: pointer;">😊</span>
-                            <span style="cursor: pointer;">📎</span>
+                            <input type="file" id="brain-file-input" style="display:none" accept="image/*,application/pdf" onchange="handleBrainFileSelect(event)">
+                            <span style="cursor: pointer;" title="Anexar Ficheiro (PDF/Imagens)" onclick="document.getElementById('brain-file-input').click()">📎</span>
+                            <span style="cursor: pointer;" title="Apenas Imagem" onclick="document.getElementById('brain-file-input').click()">🖼️</span>
                         </div>
                         <input type="text" id="brain-input" placeholder="Digite sua dúvida estratégica..." 
                                style="flex: 1; border: none; padding: 12px 0; font-size: 15px; outline: none; color: #2d3748; background: transparent;"

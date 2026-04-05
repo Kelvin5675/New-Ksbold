@@ -2199,8 +2199,17 @@ async function sendMessageToBrain() {
     const finalMsg = text || (pendingBrainFile ? "Analise este ficheiro para mim, por favor." : "");
     if (!finalMsg) return;
 
-    // 1. Adicionar mensagem do usuário (com indicador de anexo se houver)
-    addChatMessage('user', text + (pendingBrainFile ? `\n\n[Anexo: ${pendingBrainFile.name}]` : ''));
+    // 1. Adicionar mensagem do usuário (com indicador de anexo ou miniatura)
+    let userDisplayMsg = text;
+    if (pendingBrainFile) {
+        if (pendingBrainFile.mime_type.startsWith('image/')) {
+            userDisplayMsg += `\n<div style="margin-top: 10px;"><img src="data:${pendingBrainFile.mime_type};base64,${pendingBrainFile.data}" style="max-width: 100%; max-height: 180px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);"></div>`;
+        } else {
+            userDisplayMsg += `\n\n[Anexo: ${pendingBrainFile.name}]`;
+        }
+    }
+    
+    addChatMessage('user', userDisplayMsg || "[Imagem Anexada]");
     input.value = '';
 
     // 2. Mostrar estado de "Pensando..." (Premium Animation)
@@ -2359,33 +2368,42 @@ function handleBrainFileSelect(event) {
 
     const reader = new FileReader();
     reader.onload = function(e) {
+        const dataUri = e.target.result;
         pendingBrainFile = {
             mime_type: file.type,
-            data: e.target.result.split(',')[1], // Apenas o base64
+            data: dataUri.split(',')[1], // Apenas o base64
             name: file.name
         };
         
-        // Feedback visual: mostrar nome do ficheiro em cima do input
-        showBrainFilePreview(file.name);
+        // Feedback visual: mostrar miniatura do ficheiro
+        showBrainFilePreview(file.name, file.type, dataUri);
     };
     reader.readAsDataURL(file);
 }
 
-function showBrainFilePreview(name) {
+function showBrainFilePreview(name, mimeType, dataUri) {
     const container = document.getElementById('brain-chat-container');
     let preview = document.getElementById('brain-file-preview');
     
     if (!preview) {
         preview = document.createElement('div');
         preview.id = 'brain-file-preview';
-        preview.style = "background: #eef2f7; padding: 10px 15px; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #475569; position: sticky; bottom: 0; z-index: 5; border: 1px dashed #cbd5e1;";
+        preview.style = "background: #eef2f7; padding: 10px 15px; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 15px; font-size: 13px; color: #475569; position: sticky; bottom: 0; z-index: 5; border: 1px dashed #cbd5e1; box-shadow: 0 -4px 10px rgba(0,0,0,0.02);";
         container.appendChild(preview);
     }
     
+    let midiaHTML = `<i class="fas fa-file" style="font-size: 24px; color: #94a3b8; margin-top: 5px;"></i>`;
+    if (mimeType && mimeType.startsWith('image/')) {
+        midiaHTML = `<img src="${dataUri}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`;
+    }
+    
     preview.innerHTML = `
-        <i class="fas fa-file"></i>
-        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📎 ${name}</span>
-        <i class="fas fa-times" style="cursor:pointer; color:#ef4444;" onclick="clearBrainFile()"></i>
+        ${midiaHTML}
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
+            <strong style="color: #334155; font-size: 12px;">Anexo Pronto:</strong>
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${name}</span>
+        </div>
+        <i class="fas fa-times" style="cursor:pointer; color:#ef4444; font-size: 16px; padding: 5px;" onclick="clearBrainFile()" title="Remover anexo"></i>
     `;
     container.scrollTop = container.scrollHeight;
 }

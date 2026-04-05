@@ -142,6 +142,27 @@ def tool_enviar_whatsapp(numero, mensagem):
         return f"✅ Relatorio/Mensagem enviada com sucesso para {numero}."
     except Exception as e: return f"❌ Erro ao enviar WhatsApp: {str(e)}"
 
+def tool_enviar_midia_whatsapp(numero, media_base64, mime_type, legenda):
+    """Envie PDFs ou Imagens para o WhatsApp. 'media_base64' é o conteudo visual base64. Mimetype pode ser 'image/jpeg' ou 'application/pdf'."""
+    if not numero or not media_base64: return "Falta numero ou midia."
+    media_url = WHATSAPP_API_URL.replace("sendText", "sendMedia")
+    p = {
+        "number": numero, 
+        "options": {"delay": 1000, "presence": "composing"}, 
+        "mediaMessage": {
+            "mediatype": "document" if "pdf" in mime_type else "image",
+            "caption": legenda,
+            "media": f"data:{mime_type};base64,{media_base64}",
+            "fileName": "documento.pdf" if "pdf" in mime_type else "imagem.jpg"
+        }
+    }
+    h = {"Content-Type": "application/json", "apikey": EVOLUTION_API_KEY}
+    try:
+        res = requests.post(media_url, json=p, headers=h)
+        return f"✅ Midia enviada para {numero}. {res.text}"
+    except Exception as e: return f"❌ Erro midia: {str(e)}"
+
+
 def get_ksbold_snapshot():
     try:
         orders = supabase.table("orders").select("preco, status").execute().data or []
@@ -275,9 +296,14 @@ MEMORIAS DE LONGO PRAZO:
                 
                 # --- ⚡ TENTATIVA 2: GROQ (Llama 3.3 e 3.2 Vision) ---
                 if not final_text and GROQ_API_KEY:
-                    groq_models = ["llama-3.3-70b-versatile", "llama-3.2-11b-vision-preview"]
                     media = data.get('media') # { "mime_type": "image/jpeg", "data": "base64..." }
                     
+                    # Se tiver mídia, forçar o modelo de Visão primeiro!
+                    if media:
+                        groq_models = ["llama-3.2-90b-vision-preview"]
+                    else:
+                        groq_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+
                     for g_model in groq_models:
                         try:
                             headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
@@ -292,10 +318,38 @@ MEMORIAS DE LONGO PRAZO:
                                 ]
 
                             data_groq = {"model": g_model, "messages": ms_groq, "temperature": 0.6}
+                            
+                            # Adicionar payload de ferramentas se não for vision (Llama vision não suporta tool calling)
+                            if "vision" not in g_model:
+                                data_groq["tools"] = [
+                                    {"type": "function", "function": {"name": "tool_executar_campanha", "description": "Orquestra uma campanha (Copywriter + Designer) e entrega a pauta completa.", "parameters": {"type": "object", "properties": {"tema": {"type": "string"}}, "required": ["tema"]}}},
+                                    {"type": "function", "function": {"name": "tool_salvar_memoria", "description": "Grave uma informacao para o futuro. (Meta, Regra, etc)", "parameters": {"type": "object", "properties": {"chave": {"type": "string"}, "valor": {"type": "string"}}, "required": ["chave", "valor"]}}},
+                                    {"type": "function", "function": {"name": "tool_enviar_whatsapp", "description": "Usa a Evolution API para enviar uma mensagem real no WhatsApp para qualquer numero. Muito util para enviar os resultados das campanhas ao CEO.", "parameters": {"type": "object", "properties": {"numero": {"type": "string", "description": "Numero em formato +258..."}, "mensagem": {"type": "string", "description": "Conteudo a enviar"}}, "required": ["numero", "mensagem"]}}}
+                                ]
+
                             gr_resp = requests.post("https://api.groq.com/openai/v1/chat/completions", json=data_groq, headers=headers, timeout=20)
                             
                             if gr_resp.status_code == 200:
-                                final_text = gr_resp.json()['choices'][0]['message']['content']
+                                resp_msg = gr_resp.json()['choices'][0]['message']
+                                if resp_msg.get('tool_calls'):
+                                    ms_groq.append(resp_msg) # Anexa a call da assistente q contém os tool calls
+                                    for t in resp_msg['tool_calls']:
+                                        fn = t['function']['name']
+                                        args = json.loads(t['function']['arguments'])
+                                        res_t = ""
+                                        if fn == "tool_executar_campanha": res_t = tool_executar_campanha(args.get('tema',''))
+                                        elif fn == "tool_salvar_memoria": res_t = tool_salvar_memoria(args.get('chave',''), args.get('valor',''))
+                                        elif fn == "tool_enviar_whatsapp": res_t = tool_enviar_whatsapp(args.get('numero',''), args.get('mensagem',''))
+                                        else: res_t = "Erro ferramenta não encontrada"
+                                        
+                                        ms_groq.append({"role": "tool", "tool_call_id": t['id'], "name": fn, "content": str(res_t)})
+                                    
+                                    # Chamada secundária para colher a resposta com os dados das ferramentas
+                                    data_groq = {"model": g_model, "messages": ms_groq, "temperature": 0.6}
+                                    gr_resp2 = requests.post("https://api.groq.com/openai/v1/chat/completions", json=data_groq, headers=headers, timeout=20)
+                                    final_text = gr_resp2.json()['choices'][0]['message']['content']
+                                else:
+                                    final_text = resp_msg.get('content', '')
                                 break
                             else:
                                 ultimo_erro = f"Groq {g_model}: {gr_resp.json().get('error', {}).get('message', 'Erro')}"
